@@ -56,7 +56,7 @@ VAR         [Vv][Aa][Rr]
 
 
 %x PURE_PHP
-%x INSERTED_PHP
+%x INTERPOLATED_PHP
 %x COMMENT_HTML
 %x COMMENT_MULTILINE
 %x STRING_SINGLE_QUOTES
@@ -64,35 +64,47 @@ VAR         [Vv][Aa][Rr]
 %x STRING_HEREDOC_OR_NOWDOC
 %x STRING_HEREDOC
 %x STRING_NOWDOC
+%x ARRAY_CONTENT
 
 
 %{
+	#define CONSOLE_LOG_ENABLED
+	#define CONSOLE_STATE_LOG_ENABLED
+
 	#include <iostream>
+	#include <vector>
 	#include <cstring>
 	#include <cstdlib>
+	#include <sstream>
 
+	using std::ostringstream;
 	using std::string;
+	using std::vector;
 	using std::cout;
 
 	class Console {
 	public:
+		static void LogHeader();
 		static void Log(const string message);
 		static void Log(int line, const string content, const string info);
 		static void Log(int line, int content, const string info);
 		static void Log(int line, double content, const string info);
+		static void Log(int line, const string content, const string info, bool isSecondaryColor);
 		static void Log(int lineStart, int lineEnd, const string content, const string info);
 		static void Error(const string message, int line);
 	};
 
 	class State {
 	public:
-		static int _states[100];
-		static int _index;
-
+		static vector<int> _states;
+		
 		static int PushAndPeek(int state);
 		static int PopAndPeek();
 		static int Current();
-		static int PreviousState();
+		static int Previous();
+
+		static string GetStateTree();
+		static string StateCodeToString(int state);
 	};
 
 	class Buffer {
@@ -104,7 +116,6 @@ VAR         [Vv][Aa][Rr]
 		static string Current();
 		static void Reset();
 		static void Append(string text);
-		static void Cut(int count);
 		static void SetStartLine(int line);
 		static int GetStartLine();
 		static void SetDocId(string id, int erase = 0);
@@ -117,52 +128,77 @@ VAR         [Vv][Aa][Rr]
 
 
 %{
-	State::PushAndPeek(INITIAL);
-	BEGIN(State::Current());
+	Console::LogHeader();
+	BEGIN(State::PushAndPeek(INITIAL));
 %}
 
-\<\?([pP][hH][pP])?							{ BEGIN(PURE_PHP); Console::Log(yylineno, yytext, "opening php tag"); }
-<PURE_PHP>\?\>								{ BEGIN(INITIAL); Console::Log(yylineno, yytext, "closing php tag"); }
-<PURE_PHP><<EOF>>							{ BEGIN(INITIAL); Console::Log(yylineno, yytext, "end of file - closing php tag"); }
+\<\?([pP][hH][pP])?				{ Console::Log(yylineno, yytext, "opening php tag"); BEGIN(State::PushAndPeek(PURE_PHP)); }
+<PURE_PHP>\?\>					{ Console::Log(yylineno, yytext, "closing php tag"); BEGIN(State::PushAndPeek(INITIAL)); }
+<PURE_PHP><<EOF>>				{ Console::Log(yylineno, yytext, "end of file - closing php tag"); BEGIN(State::PushAndPeek(INITIAL)); }
 
-"<!--"							{  BEGIN(State::PushAndPeek(COMMENT_HTML)); }
+"<!--"							{ BEGIN(State::PushAndPeek(COMMENT_HTML)); }
 <COMMENT_HTML>[^\-]+			;
 <COMMENT_HTML>"-"				;
 <COMMENT_HTML>\-{2}\>			{ BEGIN(State::PopAndPeek()); }
 
-<PURE_PHP>("//"|"#").*       	{ Console::Log(yylineno, yytext, "comment"); }
+<PURE_PHP>("//"|"#").*       	{ Console::Log(yylineno, yytext, "comment", true); }
 
-<PURE_PHP>"/*"					{  BEGIN(State::PushAndPeek(COMMENT_MULTILINE)); }
-<COMMENT_MULTILINE>[^*]+		;
-<COMMENT_MULTILINE>"*"+[^*/] 	;
-<COMMENT_MULTILINE>"*"+"/" 		{ BEGIN(State::PopAndPeek()); }
+<PURE_PHP>"/*"    				{ 
+									BEGIN(State::PushAndPeek(COMMENT_MULTILINE)); 
+									Buffer::Reset(); 
+									Buffer::SetStartLine(yylineno);
+									Buffer::Append(yytext);
+								}
+<COMMENT_MULTILINE>[^*]+        { Buffer::Append(yytext); }
+<COMMENT_MULTILINE>"*"+[^*/]    { Buffer::Append(yytext); }
+<COMMENT_MULTILINE>"*"+"/"      { 
+									Buffer::Append(yytext);
+									Console::Log(Buffer::GetStartLine(), yylineno, Buffer::Current(), "multiline comment");
+									Buffer::Reset();
+									BEGIN(State::PopAndPeek()); 
+								}
 
-<PURE_PHP>\'						{ BEGIN(STRING_SINGLE_QUOTES); Buffer::Reset(); Buffer::SetStartLine(yylineno); }
+<PURE_PHP,ARRAY_CONTENT>\'			{ BEGIN(State::PushAndPeek(STRING_SINGLE_QUOTES)); Buffer::Reset(); Buffer::SetStartLine(yylineno); }
 <STRING_SINGLE_QUOTES>\n			{ Console::Error("new line in STRING_SINGLE_QUOTES", yylineno); }
 <STRING_SINGLE_QUOTES>\\\n			{ Buffer::Append(yytext); }
 <STRING_SINGLE_QUOTES>\\\'			{ Buffer::Append("\'"); }
 <STRING_SINGLE_QUOTES>\\\\     		{ Buffer::Append("\\"); }
 <STRING_SINGLE_QUOTES>\\[^\\\']     { Buffer::Append(yytext); }
-<STRING_SINGLE_QUOTES>[^\\\']+		{ Buffer::Append(yytext); }
+<STRING_SINGLE_QUOTES>[^\\\'\n]+	{ Buffer::Append(yytext); }
 <STRING_SINGLE_QUOTES>\'			{
-	Console::Log(Buffer::GetStartLine(), yylineno, Buffer::Current(), "string in STRING_SINGLE_QUOTES");
-	Buffer::Reset();
-	BEGIN(PURE_PHP);
-}
+										Console::Log(Buffer::GetStartLine(), yylineno, Buffer::Current(), "string in STRING_SINGLE_QUOTES");
+										Buffer::Reset();
+										BEGIN(State::PopAndPeek());
+									}
 
 <PURE_PHP>"<<<"              						{  BEGIN(State::PushAndPeek(STRING_HEREDOC_OR_NOWDOC)); }
 <STRING_HEREDOC_OR_NOWDOC>[ \t]*            		;
-<STRING_HEREDOC_OR_NOWDOC>(\'{ID}\'|{ID})[^\n]      { BEGIN(State::PopAndPeek()); Console::Error("Invalid \"<<<\" identifier in STRING_HEREDOC_OR_NOWDOC", yylineno); }
-<STRING_HEREDOC_OR_NOWDOC>\'{ID}\'\n          		{ State::PopAndPeek();  BEGIN(State::PushAndPeek(STRING_NOWDOC)); Buffer::Reset(); Buffer::SetDocId(yytext, 2); Buffer::SetStartLine(yylineno); }
-<STRING_HEREDOC_OR_NOWDOC>{ID}\n            		{ State::PopAndPeek();  BEGIN(State::PushAndPeek(STRING_HEREDOC)); Buffer::Reset(); Buffer::SetDocId(yytext, 1); Buffer::SetStartLine(yylineno); }
+<STRING_HEREDOC_OR_NOWDOC>(\'{ID}\'|{ID})[^\n]      { Console::Error("Invalid \"<<<\" identifier in STRING_HEREDOC_OR_NOWDOC", yylineno); BEGIN(State::PopAndPeek()); }
 
-<STRING_NOWDOC,STRING_HEREDOC>{ID};\n			{
+<STRING_HEREDOC_OR_NOWDOC>\'{ID}\'\n    { 
+											State::PopAndPeek();  
+											Buffer::Reset(); 
+											Buffer::SetDocId(yytext+1, 2); 
+											Buffer::SetStartLine(yylineno); 
+											Console::Log(yylineno, Buffer::GetDocId(), "start of STRING_NOWDOC");
+											BEGIN(State::PushAndPeek(STRING_NOWDOC)); 
+										}
+<STRING_HEREDOC_OR_NOWDOC>{ID}\n    	{ 
+											State::PopAndPeek();  
+											Buffer::Reset(); 
+											Buffer::SetDocId(yytext, 1); 
+											Buffer::SetStartLine(yylineno); 
+											Console::Log(yylineno, Buffer::GetDocId(), "start of STRING_HEREDOC");
+											BEGIN(State::PushAndPeek(STRING_HEREDOC)); 
+										}
+
+<STRING_NOWDOC,STRING_HEREDOC>^{ID};\n			{
 													if (string(yytext, strcspn(yytext, ";")) != Buffer::GetDocId()) {
 														Buffer::Append(yytext);
 													}
 													else {
-														Buffer::Cut(1);
 														Console::Log(Buffer::GetStartLine(), yylineno, Buffer::Current(), "text in STRING_NOWDOC/STRING_HEREDOC");
+														Console::Log(yylineno, Buffer::GetDocId(), "end of STRING_NOWDOC/STRING_HEREDOC");
 														Buffer::Reset();
 														BEGIN(State::PopAndPeek());
 													}
@@ -171,11 +207,11 @@ VAR         [Vv][Aa][Rr]
 <STRING_NOWDOC>\n+					{ Buffer::Append(yytext); }
 <STRING_NOWDOC>[^\s\n]+				{ Buffer::Append(yytext); }
 
-<PURE_PHP>"\""						{  BEGIN(State::PushAndPeek(STRING_DOUBLE_QUOTES)); Buffer::Reset(); Buffer::SetStartLine(yylineno); }
+<PURE_PHP,ARRAY_CONTENT>"\""						{  BEGIN(State::PushAndPeek(STRING_DOUBLE_QUOTES)); Buffer::Reset(); Buffer::SetStartLine(yylineno); }
 
 <STRING_DOUBLE_QUOTES>\n			 				{ Console::Error("new line in STRING_DOUBLE_QUOTES", yylineno); }
 
-<STRING_DOUBLE_QUOTES>[^\\\"\$\{]+					{ Buffer::Append(yytext); }
+<STRING_DOUBLE_QUOTES>[^\\\"\$\{\n]+					{ Buffer::Append(yytext); }
 
 <STRING_HEREDOC>[^\\\$\{]							{ Buffer::Append(yytext); }
 
@@ -189,14 +225,21 @@ VAR         [Vv][Aa][Rr]
 														Buffer::Reset();
 													}
 <STRING_DOUBLE_QUOTES,STRING_HEREDOC>\$				{ Buffer::Append("$"); }
-<STRING_DOUBLE_QUOTES,STRING_HEREDOC>(\{\$)|(\$\{) 	{
+<STRING_DOUBLE_QUOTES,STRING_HEREDOC>\{\$ 			{
 														Console::Log(Buffer::GetStartLine(), yylineno, Buffer::Current(), "string inside STRING_DOUBLE_QUOTES/STRING_HEREDOC");
-														Console::Log(yylineno, "$", "operator \"$\" inside STRING_DOUBLE_QUOTES/STRING_HEREDOC");
+														Console::Log(yylineno, "{", "operator { inside STRING_DOUBLE_QUOTES/STRING_HEREDOC before INTERPOLATED_PHP");
+														Console::Log(yylineno, "$", "operator $ inside INTERPOLATED_PHP");
 														Buffer::Reset();
-														BEGIN(State::PushAndPeek(INSERTED_PHP));
+														BEGIN(State::PushAndPeek(INTERPOLATED_PHP));
 													}
-
-<INSERTED_PHP>\}									{ BEGIN(State::PopAndPeek()); Console::Log(yylineno, yytext, "operator } inside INSERTED_PHP"); }
+<STRING_DOUBLE_QUOTES,STRING_HEREDOC>\$\{\$ 		{
+														Console::Log(Buffer::GetStartLine(), yylineno, Buffer::Current(), "string inside STRING_DOUBLE_QUOTES/STRING_HEREDOC");
+														Console::Log(yylineno, "$", "operator \"$\" inside STRING_DOUBLE_QUOTES/STRING_HEREDOC before INTERPOLATED_PHP");
+														Console::Log(yylineno, "{", "operator { inside STRING_DOUBLE_QUOTES/STRING_HEREDOC before INTERPOLATED_PHP");
+														Console::Log(yylineno, "$", "operator \"$\" inside INTERPOLATED_PHP");
+														Buffer::Reset();
+														BEGIN(State::PushAndPeek(INTERPOLATED_PHP));
+													}
 
 <STRING_DOUBLE_QUOTES,STRING_HEREDOC>\{						{ Buffer::Append(yytext); }
 <STRING_DOUBLE_QUOTES,STRING_HEREDOC>\\\\					{ Buffer::Append("\\"); }
@@ -209,159 +252,251 @@ VAR         [Vv][Aa][Rr]
 <STRING_DOUBLE_QUOTES,STRING_HEREDOC>\\[0-7]{1,3}  			{ Buffer::Append(string(1, (char)strtol(yytext+1,NULL,8))); }
 <STRING_DOUBLE_QUOTES,STRING_HEREDOC>\\x[0-9A-Fa-f]{1,2}   	{ Buffer::Append(string(1, (char)strtol(yytext+2,NULL,16))); }
 <STRING_DOUBLE_QUOTES>\\\"			 						{ Buffer::Append("\""); }
-<STRING_DOUBLE_QUOTES>\"			 						{ BEGIN(PURE_PHP); Console::Log(yylineno, Buffer::Current(), "string inside STRING_DOUBLE_QUOTES"); Buffer::Reset(); }
+<STRING_DOUBLE_QUOTES>\"			 						{ Console::Log(yylineno, Buffer::Current(), "string inside STRING_DOUBLE_QUOTES"); Buffer::Reset(); BEGIN(State::PopAndPeek()); }
 
 <STRING_DOUBLE_QUOTES,STRING_HEREDOC>\\		{ Buffer::Append("\\"); }
-<STRING_HEREDOC>[^\\\"\$\{]+ 				{ Buffer::Append(yytext); }
+<STRING_HEREDOC>[^\\\"\$\{\n]+ 				{ Buffer::Append(yytext); }
 
 
+<COMMENT_HTML,COMMENT_MULTILINE,STRING_HEREDOC_OR_NOWDOC,STRING_NOWDOC,STRING_HEREDOC,STRING_SINGLE_QUOTES,STRING_DOUBLE_QUOTES,ARRAY_CONTENT><<EOF>> { Console::Error("end of file", yylineno); BEGIN(INITIAL); }
 
 
-<COMMENT_HTML,COMMENT_MULTILINE,STRING_HEREDOC_OR_NOWDOC,STRING_NOWDOC,STRING_HEREDOC,STRING_SINGLE_QUOTES,STRING_DOUBLE_QUOTES><<EOF>> { BEGIN(INITIAL); Console::Error("end of file", yylineno); }
+<PURE_PHP>{ENDFOREACH}   { Console::Log(yylineno, yytext, "keyword ENDFOREACH"); }
+<PURE_PHP>{ENDWHILE}     { Console::Log(yylineno, yytext, "keyword ENDWHILE"); }
+<PURE_PHP>{ENDSWITCH}    { Console::Log(yylineno, yytext, "keyword ENDSWITCH"); }
+<PURE_PHP>{ENDFOR}       { Console::Log(yylineno, yytext, "keyword ENDFOR"); }
+<PURE_PHP>{ENDIF}        { Console::Log(yylineno, yytext, "keyword ENDIF"); }
+<PURE_PHP>{FOREACH}      { Console::Log(yylineno, yytext, "keyword FOREACH"); }
+<PURE_PHP>{INSTANCEOF}   { Console::Log(yylineno, yytext, "keyword INSTANCEOF"); }
+<PURE_PHP>{PROTECTED}    { Console::Log(yylineno, yytext, "keyword PROTECTED"); }
+<PURE_PHP>{CONTINUE}     { Console::Log(yylineno, yytext, "keyword CONTINUE"); }
+<PURE_PHP>{FUNCTION}     { Console::Log(yylineno, yytext, "keyword FUNCTION"); }
+<PURE_PHP>{EXTENDS}      { Console::Log(yylineno, yytext, "keyword EXTENDS"); }
+<PURE_PHP>{STATIC}       { Console::Log(yylineno, yytext, "keyword STATIC"); }
+<PURE_PHP>{PUBLIC}       { Console::Log(yylineno, yytext, "keyword PUBLIC"); }
+<PURE_PHP>{PRIVATE}      { Console::Log(yylineno, yytext, "keyword PRIVATE"); }
+<PURE_PHP>{DEFAULT}      { Console::Log(yylineno, yytext, "keyword DEFAULT"); }
+<PURE_PHP>{ELSEIF}       { Console::Log(yylineno, yytext, "keyword ELSEIF"); }
+<PURE_PHP>{SWITCH}       { Console::Log(yylineno, yytext, "keyword SWITCH"); }
+<PURE_PHP>{RETURN}       { Console::Log(yylineno, yytext, "keyword RETURN"); }
+<PURE_PHP>{BREAK}        { Console::Log(yylineno, yytext, "keyword BREAK"); }
+<PURE_PHP>{CONST}        { Console::Log(yylineno, yytext, "keyword CONST"); }
+<PURE_PHP>{CLASS}        { Console::Log(yylineno, yytext, "keyword CLASS"); }
+<PURE_PHP>{WHILE}        { Console::Log(yylineno, yytext, "keyword WHILE"); }
+<PURE_PHP>{ELSE}         { Console::Log(yylineno, yytext, "keyword ELSE"); }
+<PURE_PHP>{CASE}         { Console::Log(yylineno, yytext, "keyword CASE"); }
+<PURE_PHP>{ECHO}         { Console::Log(yylineno, yytext, "keyword ECHO"); }
+<PURE_PHP>{AND}          { Console::Log(yylineno, yytext, "keyword AND"); }
+<PURE_PHP>{XOR}          { Console::Log(yylineno, yytext, "keyword XOR"); }
+<PURE_PHP>{NEW}          { Console::Log(yylineno, yytext, "keyword NEW"); }
+<PURE_PHP>{VAR}          { Console::Log(yylineno, yytext, "keyword VAR"); }
+<PURE_PHP>{FOR}          { Console::Log(yylineno, yytext, "keyword FOR"); }
+<PURE_PHP>{OR}           { Console::Log(yylineno, yytext, "keyword OR"); }
+<PURE_PHP>{AS}           { Console::Log(yylineno, yytext, "keyword AS"); }
+<PURE_PHP>{IF}           { Console::Log(yylineno, yytext, "keyword IF"); }
+<PURE_PHP>{DO}           { Console::Log(yylineno, yytext, "keyword DO"); }
+<PURE_PHP>array			 { Console::Log(yylineno, yytext, "type array"); }
+<PURE_PHP>callable		 { Console::Log(yylineno, yytext, "type callable"); }
 
-<INSERTED_PHP,PURE_PHP>{ENDFOREACH}   { Console::Log(yylineno, yytext, "keyword ENDFOREACH"); }
-<INSERTED_PHP,PURE_PHP>{ENDWHILE}     { Console::Log(yylineno, yytext, "keyword ENDWHILE"); }
-<INSERTED_PHP,PURE_PHP>{ENDSWITCH}    { Console::Log(yylineno, yytext, "keyword ENDSWITCH"); }
-<INSERTED_PHP,PURE_PHP>{ENDFOR}       { Console::Log(yylineno, yytext, "keyword ENDFOR"); }
-<INSERTED_PHP,PURE_PHP>{ENDIF}       { Console::Log(yylineno, yytext, "keyword ENDIF"); }
-<INSERTED_PHP,PURE_PHP>{FOREACH}      { Console::Log(yylineno, yytext, "keyword FOREACH"); }
-<INSERTED_PHP,PURE_PHP>{INSTANCEOF}   { Console::Log(yylineno, yytext, "keyword INSTANCEOF"); }
-<INSERTED_PHP,PURE_PHP>{PROTECTED}    { Console::Log(yylineno, yytext, "keyword PROTECTED"); }
-<INSERTED_PHP,PURE_PHP>{CONTINUE}     { Console::Log(yylineno, yytext, "keyword CONTINUE"); }
-<INSERTED_PHP,PURE_PHP>{FUNCTION}     { Console::Log(yylineno, yytext, "keyword FUNCTION"); }
-<INSERTED_PHP,PURE_PHP>{EXTENDS}      { Console::Log(yylineno, yytext, "keyword EXTENDS"); }
-<INSERTED_PHP,PURE_PHP>{STATIC}       { Console::Log(yylineno, yytext, "keyword STATIC"); }
-<INSERTED_PHP,PURE_PHP>{PUBLIC}       { Console::Log(yylineno, yytext, "keyword PUBLIC"); }
-<INSERTED_PHP,PURE_PHP>{PRIVATE}      { Console::Log(yylineno, yytext, "keyword PRIVATE"); }
-<INSERTED_PHP,PURE_PHP>{DEFAULT}      { Console::Log(yylineno, yytext, "keyword DEFAULT"); }
-<INSERTED_PHP,PURE_PHP>{ELSEIF}       { Console::Log(yylineno, yytext, "keyword ELSEIF"); }
-<INSERTED_PHP,PURE_PHP>{SWITCH}       { Console::Log(yylineno, yytext, "keyword SWITCH"); }
-<INSERTED_PHP,PURE_PHP>{RETURN}       { Console::Log(yylineno, yytext, "keyword RETURN"); }
-<INSERTED_PHP,PURE_PHP>{BREAK}        { Console::Log(yylineno, yytext, "keyword BREAK"); }
-<INSERTED_PHP,PURE_PHP>{CONST}        { Console::Log(yylineno, yytext, "keyword CONST"); }
-<INSERTED_PHP,PURE_PHP>{CLASS}        { Console::Log(yylineno, yytext, "keyword CLASS"); }
-<INSERTED_PHP,PURE_PHP>{WHILE}        { Console::Log(yylineno, yytext, "keyword WHILE"); }
-<INSERTED_PHP,PURE_PHP>{ELSE}         { Console::Log(yylineno, yytext, "keyword ELSE"); }
-<INSERTED_PHP,PURE_PHP>{CASE}         { Console::Log(yylineno, yytext, "keyword CASE"); }
-<INSERTED_PHP,PURE_PHP>{ECHO}         { Console::Log(yylineno, yytext, "keyword ECHO"); }
-<INSERTED_PHP,PURE_PHP>{AND}          { Console::Log(yylineno, yytext, "keyword AND"); }
-<INSERTED_PHP,PURE_PHP>{XOR}          { Console::Log(yylineno, yytext, "keyword XOR"); }
-<INSERTED_PHP,PURE_PHP>{NEW}          { Console::Log(yylineno, yytext, "keyword NEW"); }
-<INSERTED_PHP,PURE_PHP>{VAR}          { Console::Log(yylineno, yytext, "keyword VAR"); }
-<INSERTED_PHP,PURE_PHP>{FOR}          { Console::Log(yylineno, yytext, "keyword FOR"); }
-<INSERTED_PHP,PURE_PHP>{OR}           { Console::Log(yylineno, yytext, "keyword OR"); }
-<INSERTED_PHP,PURE_PHP>{AS}           { Console::Log(yylineno, yytext, "keyword AS"); }
-<INSERTED_PHP,PURE_PHP>{IF}           { Console::Log(yylineno, yytext, "keyword IF"); }
-<INSERTED_PHP,PURE_PHP>{DO}           { Console::Log(yylineno, yytext, "keyword DO"); }
+<PURE_PHP>"===" { Console::Log(yylineno, yytext, "operator ==="); }
+<PURE_PHP>"!==" { Console::Log(yylineno, yytext, "operator !=="); }
+<PURE_PHP>"::"  { Console::Log(yylineno, yytext, "operator ::"); }
+<PURE_PHP>"**"  { Console::Log(yylineno, yytext, "operator **"); }
+<PURE_PHP>"<="  { Console::Log(yylineno, yytext, "operator <="); }
+<PURE_PHP>">="  { Console::Log(yylineno, yytext, "operator >="); }
+<PURE_PHP>"=="  { Console::Log(yylineno, yytext, "operator =="); }
+<PURE_PHP>"!="  { Console::Log(yylineno, yytext, "operator !="); }
+<PURE_PHP>"<>"  { Console::Log(yylineno, yytext, "operator <>"); }
+<PURE_PHP>"&&"  { Console::Log(yylineno, yytext, "operator &&"); }
+<PURE_PHP>"||"  { Console::Log(yylineno, yytext, "operator ||"); }
+<PURE_PHP>"!"   { Console::Log(yylineno, yytext, "operator !"); }
+<PURE_PHP>"*"   { Console::Log(yylineno, yytext, "operator *"); }
+<PURE_PHP>"/"   { Console::Log(yylineno, yytext, "operator /"); }
+<PURE_PHP>"%"   { Console::Log(yylineno, yytext, "operator %"); }
+<PURE_PHP>"+"   { Console::Log(yylineno, yytext, "operator +"); }
+<PURE_PHP>"."   { Console::Log(yylineno, yytext, "operator ."); }
+<PURE_PHP>"-"   { Console::Log(yylineno, yytext, "operator -"); }
+<PURE_PHP>"<"   { Console::Log(yylineno, yytext, "operator <"); }
+<PURE_PHP>">"   { Console::Log(yylineno, yytext, "operator >"); }
+<PURE_PHP>"="   { Console::Log(yylineno, yytext, "operator ="); }
+<PURE_PHP>"$"   { Console::Log(yylineno, yytext, "operator $"); }
+<PURE_PHP>";"	{ Console::Log(yylineno, yytext, "operator ;"); }
+<PURE_PHP>":"	{ Console::Log(yylineno, yytext, "operator :"); }
+<PURE_PHP>"?"	{ Console::Log(yylineno, yytext, "operator ?"); }
+<PURE_PHP>"{"	{ Console::Log(yylineno, yytext, "operator {"); }
+<PURE_PHP>"}"	{ Console::Log(yylineno, yytext, "operator }"); }
+<PURE_PHP>"]"	{ Console::Log(yylineno, yytext, "operator ]"); }
 
-<PURE_PHP>array			{ Console::Log(yylineno, yytext, "type array"); }
-<PURE_PHP>callable		{ Console::Log(yylineno, yytext, "type callable"); }
+<INTERPOLATED_PHP>\}		{ Console::Log(yylineno, yytext, "operator } in INTERPOLATED_PHP"); BEGIN(State::PopAndPeek()); }
 
+<ARRAY_CONTENT>"]"	{ Console::Log(yylineno, yytext, "operator , in ARRAY_CONTENT"); BEGIN(State::PopAndPeek()); }
 
-<INSERTED_PHP,PURE_PHP>"==="       { Console::Log(yylineno, yytext, "operator ==="); }
-<INSERTED_PHP,PURE_PHP>"!=="       { Console::Log(yylineno, yytext, "operator !=="); }
-<INSERTED_PHP,PURE_PHP>"::"        { Console::Log(yylineno, yytext, "operator ::"); }
-<INSERTED_PHP,PURE_PHP>"->"        { Console::Log(yylineno, yytext, "operator ->"); }
-<INSERTED_PHP,PURE_PHP>"=>"        { Console::Log(yylineno, yytext, "operator =>"); }
-<INSERTED_PHP,PURE_PHP>"**"        { Console::Log(yylineno, yytext, "operator **"); }
-<INSERTED_PHP,PURE_PHP>"<="        { Console::Log(yylineno, yytext, "operator <="); }
-<INSERTED_PHP,PURE_PHP>">="        { Console::Log(yylineno, yytext, "operator >="); }
-<INSERTED_PHP,PURE_PHP>"=="        { Console::Log(yylineno, yytext, "operator =="); }
-<INSERTED_PHP,PURE_PHP>"!="        { Console::Log(yylineno, yytext, "operator !="); }
-<INSERTED_PHP,PURE_PHP>"<>"        { Console::Log(yylineno, yytext, "operator <>"); }
-<INSERTED_PHP,PURE_PHP>"&&"        { Console::Log(yylineno, yytext, "operator &&"); }
-<INSERTED_PHP,PURE_PHP>"||"        { Console::Log(yylineno, yytext, "operator ||"); }
-<INSERTED_PHP,PURE_PHP>"!"         { Console::Log(yylineno, yytext, "operator !"); }
-<INSERTED_PHP,PURE_PHP>"*"         { Console::Log(yylineno, yytext, "operator *"); }
-<INSERTED_PHP,PURE_PHP>"/"         { Console::Log(yylineno, yytext, "operator /"); }
-<INSERTED_PHP,PURE_PHP>"%"         { Console::Log(yylineno, yytext, "operator %"); }
-<INSERTED_PHP,PURE_PHP>"+"         { Console::Log(yylineno, yytext, "operator +"); }
-<INSERTED_PHP,PURE_PHP>"."         { Console::Log(yylineno, yytext, "operator ."); }
-<INSERTED_PHP,PURE_PHP>"-"         { Console::Log(yylineno, yytext, "operator -"); }
-<INSERTED_PHP,PURE_PHP>"<"         { Console::Log(yylineno, yytext, "operator <"); }
-<INSERTED_PHP,PURE_PHP>">"         { Console::Log(yylineno, yytext, "operator >"); }
-<INSERTED_PHP,PURE_PHP>"="         { Console::Log(yylineno, yytext, "operator ="); }
-<INSERTED_PHP,PURE_PHP>"$"         { Console::Log(yylineno, yytext, "operator $"); }
+<PURE_PHP,ARRAY_CONTENT>","		{ Console::Log(yylineno, yytext, "operator ,"); }
 
-<PURE_PHP>","					{ Console::Log(yylineno, yytext, "operator ,"); }
-<PURE_PHP>";" 					{ Console::Log(yylineno, yytext, "operator ;"); }
-<PURE_PHP>":" 					{ Console::Log(yylineno, yytext, "operator :"); }
-<PURE_PHP>"?" 					{ Console::Log(yylineno, yytext, "operator ?"); }
+<PURE_PHP,ARRAY_CONTENT>{TRUE}		{ Console::Log(yylineno, yytext, "value true"); }
+<PURE_PHP,ARRAY_CONTENT>{FALSE}		{ Console::Log(yylineno, yytext, "value false"); }
+<PURE_PHP,ARRAY_CONTENT>{NULL}		{ Console::Log(yylineno, yytext, "value null"); }
 
-<INSERTED_PHP,PURE_PHP>"(" 		{ Console::Log(yylineno, yytext, "operator (");}
-<INSERTED_PHP,PURE_PHP>")" 		{ Console::Log(yylineno, yytext, "operator )"); }
-<INSERTED_PHP,PURE_PHP>"{" 		{ Console::Log(yylineno, yytext, "operator {"); }
-<INSERTED_PHP,PURE_PHP>"}" 		{ Console::Log(yylineno, yytext, "operator }"); }
+<PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"(" 	{ Console::Log(yylineno, yytext, "operator (");}
+<PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>")" 	{ Console::Log(yylineno, yytext, "operator )"); }
+<PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"->"   { Console::Log(yylineno, yytext, "operator ->"); }
+<PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"=>"   { Console::Log(yylineno, yytext, "operator =>"); }
+<PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"["	{ Console::Log(yylineno, yytext, "operator ["); BEGIN(State::PushAndPeek(ARRAY_CONTENT)); }
 
-<INSERTED_PHP,PURE_PHP>"["		{ Console::Log(yylineno, yytext, "operator ["); }
-<INSERTED_PHP,PURE_PHP>"]"     	{ Console::Log(yylineno, yytext, "operator ]"); }
+<PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>{ID}	{ Console::Log(yylineno, yytext, "value ID"); }
 
-<INSERTED_PHP,PURE_PHP>{TRUE}		{ Console::Log(yylineno, yytext, "value true"); }
-<INSERTED_PHP,PURE_PHP>{FALSE}		{ Console::Log(yylineno, yytext, "value false"); }
-<INSERTED_PHP,PURE_PHP>{NULL}		{ Console::Log(yylineno, yytext, "value null"); }
+<PURE_PHP,ARRAY_CONTENT>{NUMBER_DECIMAL}		{ Console::Log(yylineno, (int)strtol(yytext,NULL,10), "value NUMBER_DECIMAL"); }
+<PURE_PHP,ARRAY_CONTENT>{NUMBER_HEXADECIMAL}	{ Console::Log(yylineno, (int)strtol(yytext,NULL,16), "value NUMBER_HEXADECIMAL"); }
+<PURE_PHP,ARRAY_CONTENT>{NUMBER_OCTAL}			{ Console::Log(yylineno, (int)strtol(yytext,NULL,8), "value NUMBER_OCTAL"); }
+<PURE_PHP,ARRAY_CONTENT>{NUMBER_BINARY}			{ Console::Log(yylineno, (int)strtol(yytext+2,NULL,2), "value NUMBER_BINARY"); }
 
-<INSERTED_PHP,PURE_PHP>{NUMBER_DECIMAL}			{ Console::Log(yylineno, (int)strtol(yytext,NULL,10), "value NUMBER_DECIMAL"); }
-<INSERTED_PHP,PURE_PHP>{NUMBER_HEXADECIMAL}		{ Console::Log(yylineno, (int)strtol(yytext,NULL,16), "value NUMBER_HEXADECIMAL"); }
-<INSERTED_PHP,PURE_PHP>{NUMBER_OCTAL}			{ Console::Log(yylineno, (int)strtol(yytext,NULL,8), "value NUMBER_OCTAL"); }
-<INSERTED_PHP,PURE_PHP>{NUMBER_BINARY}			{ Console::Log(yylineno, (int)strtol(yytext+2,NULL,2), "value NUMBER_BINARY"); }
+<PURE_PHP,ARRAY_CONTENT>{NUMBER_FLOAT}		{ Console::Log(yylineno, atof(yytext), "value NUMBER_FLOAT"); }
+<PURE_PHP,ARRAY_CONTENT>{NUMBER_EXPONENT}	{ Console::Log(yylineno, atof(yytext), "value NUMBER_EXPONENT"); }
 
-<INSERTED_PHP,PURE_PHP>{NUMBER_FLOAT}			{ Console::Log(yylineno, atof(yytext), "value NUMBER_FLOAT"); }
-<INSERTED_PHP,PURE_PHP>{NUMBER_EXPONENT}		{ Console::Log(yylineno, atof(yytext), "value NUMBER_EXPONENT"); }
-<INSERTED_PHP,PURE_PHP>{ID}						{ Console::Log(yylineno, yytext, "value ID"); }
+<INITIAL,PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>[ \t\n]+		;
 
-<INITIAL,PURE_PHP>[ \t\n]+						;
-<INITIAL>.*										;
+<INITIAL>.*		;
 
 
 %%
 
 
-int State::_states[100];
-int State::_index = 0;
+vector<int> State::_states;
 
 string Buffer::_buffer;
 string Buffer::_docId;
 int Buffer::_startLine = -1;
 
+class Color {
+public:
+    static string Reset()     		{ return "\033[0m"; }
+    static string Red()       		{ return "\033[31m"; }
+    static string Green()     		{ return "\033[32m"; }
+    static string Yellow()    		{ return "\033[33m"; }
+    static string Blue()      		{ return "\033[94m"; }
+    static string Magenta()   		{ return "\033[35m"; }
+    static string Cyan()      		{ return "\033[36m"; }
+	static string Grey() 	  		{ return "\033[90m"; }
+    static string White()     		{ return "\033[37m"; }
+    static string Bold()      		{ return "\033[1m"; }
+    static string Underline()		{ return "\033[4m"; }
+	static string Strikethrough()	{ return "\033[9m"; }
+};
+
+void Console::LogHeader() {
+	#ifdef CONSOLE_LOG_ENABLED
+		Console::Log(Color::Bold() + Color::Blue() + "=============================");
+		Console::Log(Color::Bold() + Color::Blue() + "        LEXER RUNNING        ");
+		Console::Log(Color::Bold() + Color::Blue() + "=============================");
+		Console::Log(Color::Bold() + Color::Blue() + "% CONSOLE_LOG_ENABLED");
+		
+		#ifdef CONSOLE_STATE_LOG_ENABLED
+		Console::Log(Color::Bold() + Color::Blue() + "% CONSOLE_STATE_LOG_ENABLED");
+		#endif
+		Console::Log(Color::Bold() + Color::Blue() + "=============================");
+	#endif
+}
+
 void Console::Log(const string message) {
-    cout << message << "\n";
+	#ifdef CONSOLE_LOG_ENABLED
+    	cout << message << "\n" << Color::Reset();
+	#endif
 }
 
 void Console::Log(int line, const string content, const string info) {
-    cout << "Line=" << line << " \t content = \"" << content << "\" \t\t (" << info << ")" << "\n";
+	Console::Log(line, content, info, false);
+}
+
+void Console::Log(int line, const string content, const string info, bool isSecondaryColor) {
+	#ifdef CONSOLE_LOG_ENABLED
+		cout << Color::Yellow() << "L = " << line << Color::Grey() << " \t'" << (isSecondaryColor ? Color::Cyan() : Color::Green()) << content << Color::Grey() << "' (" << info << ")" << "\n" << Color::Reset();
+	#endif
 }
 
 void Console::Log(int line, int content, const string info) {
-    cout << "Line=" << line << " \t content = \"" << content << "\" \t\t (" << info << ")" << "\n";
+	#ifdef CONSOLE_LOG_ENABLED
+    	cout << Color::Yellow() << "L = " << line << Color::Grey() << " \t'" << Color::Green() << content << Color::Grey() << "' (" << info << ")" << "\n" << Color::Reset();
+	#endif
 }
 
 void Console::Log(int line, double content, const string info) {
-    cout << "Line=" << line << " \t content = \"" << content << "\" \t\t (" << info << ")" << "\n";
+	#ifdef CONSOLE_LOG_ENABLED
+		cout << Color::Yellow() << "L = " << line << Color::Grey() << " \t'" << Color::Green() << content << Color::Grey() << "' (" << info << ")" << "\n" << Color::Reset();
+	#endif
 }
 
 void Console::Log(int lineStart, int lineEnd, const string content, const string info) {
-    cout << "Lines=" << lineStart << "-" << lineEnd << " \t content = \"" << content << "\" \t\t (" << info << ")" << "\n";
+	#ifdef CONSOLE_LOG_ENABLED
+		cout << Color::Yellow() << "L = " << lineStart << "-" << lineEnd << Color::Grey() << "\t'" << Color::Cyan() << content << Color::Grey() << "' (" << info << ")" << "\n" << Color::Reset();
+	#endif
 }
 
 void Console::Error(const string message, int line) {
-    cout << "ERROR in line " << line << ": " << message << "\n";
+	#ifdef CONSOLE_LOG_ENABLED
+		cout << Color::Bold() << Color::Red() << "ERROR in line " << line << ": " << message << "\n" << Color::Reset();
+	#endif
 }
 
 int State::PushAndPeek(int state) {
-    _states[++_index] = state;
+	_states.push_back(state);
+
+	#ifdef CONSOLE_STATE_LOG_ENABLED
+		Console::Log(Color::Magenta() + "S = " + State::GetStateTree());
+	#endif
+
     return Current();
 }
 
 int State::PopAndPeek() {
-    return _states[_index--];
+	int prev = _states.back();
+    _states.pop_back();
+
+	#ifdef CONSOLE_STATE_LOG_ENABLED
+    	Console::Log(Color::Magenta() + "S = " + State::GetStateTree() + " (was " + State::StateCodeToString(prev) + ")");
+	#endif
+
+    return _states.back();
 }
 
 int State::Current() {
-    return _states[_index];
+    return _states.back();
 }
 
-int State::PreviousState() {
-    return _states[_index - 1];
+int State::Previous() {
+    return _states[_states.size() - 2];
+}
+
+string State::GetStateTree() {
+	if (_states.empty()) {
+		return "";
+	}
+
+	std::ostringstream oss;
+	oss << Color::Magenta();
+	for (auto rit = _states.rbegin(); rit != _states.rend(); ++rit) {
+		oss << State::StateCodeToString(*rit) << Color::Grey();
+		if (rit + 1 != _states.rend()) {
+			oss << " <- ";
+		}
+	}
+	return oss.str();
+}
+
+string State::StateCodeToString(int state) {
+	switch (state) {
+		case 0:  return "INITIAL";
+		case 1:  return "PURE_PHP";
+		case 2:  return "INTERPOLATED_PHP";
+		case 3:  return "COMMENT_HTML";
+		case 4:  return "COMMENT_MULTILINE";
+		case 5:  return "STRING_SINGLE_QUOTES";
+		case 6:  return "STRING_DOUBLE_QUOTES";
+		case 7:  return "STRING_HEREDOC_OR_NOWDOC";
+		case 8:  return "STRING_HEREDOC";
+		case 9:  return "STRING_NOWDOC";
+		case 10: return "ARRAY_CONTENT";
+		default: return "UNKNOWN";
+	}
 }
 
 string Buffer::Current() {
@@ -374,10 +509,6 @@ void Buffer::Reset() {
 
 void Buffer::Append(string text) {
     _buffer += text;
-}
-
-void Buffer::Cut(int count) {
-    _buffer.erase(_buffer.size() - count);
 }
 
 void Buffer::SetStartLine(int line) {
