@@ -1,13 +1,15 @@
 <?php
 // Heredoc с интерполяцией
-// $heredoc = <<<HTML
-// <div class="container">
-//     <h1>Hello $username</h1>
-//     <p>Email: {$user->getEmail()}</p>
-//     <p>Array: {$data[key]}</p>
-//     Escape: \\ \$ \n
-// </div>
-// HTML;
+$heredoc = <<<HTML
+<div class="container">
+    <h1>Hello $username</h1>
+    <p>Email: {$user->getEmail()}</p>
+    <p>Array: {$data[key]}</p>
+    Escape: \\ \$ \n
+</div>
+HTML;
+
+$hi = 'lol';
 
 // Nowdoc без интерполяции
 $nowdoc = <<<'TEXT'
