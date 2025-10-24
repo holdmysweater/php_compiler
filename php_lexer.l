@@ -192,10 +192,10 @@ VAR         [Vv][Aa][Rr]
 <STRING_DOUBLE_QUOTES,STRING_HEREDOC>(\{\$)|(\$\{) 	{
 														Console::Log(Buffer::GetStartLine(), yylineno, Buffer::Current(), "string inside STRING_DOUBLE_QUOTES/STRING_HEREDOC");
 														Console::Log(yylineno, "$", "operator \"$\" inside STRING_DOUBLE_QUOTES/STRING_HEREDOC");
-														Console::Log(yylineno, yytext+1, "identifier inside STRING_DOUBLE_QUOTES/STRING_HEREDOC");
 														Buffer::Reset();
 														BEGIN(State::PushAndPeek(INSERTED_PHP));
 													}
+
 <INSERTED_PHP>\}									{ BEGIN(State::PopAndPeek()); Console::Log(yylineno, yytext, "operator } inside INSERTED_PHP"); }
 
 <STRING_DOUBLE_QUOTES,STRING_HEREDOC>\{						{ Buffer::Append(yytext); }
@@ -212,7 +212,7 @@ VAR         [Vv][Aa][Rr]
 <STRING_DOUBLE_QUOTES>\"			 						{ BEGIN(PURE_PHP); Console::Log(yylineno, Buffer::Current(), "string inside STRING_DOUBLE_QUOTES"); Buffer::Reset(); }
 
 <STRING_DOUBLE_QUOTES,STRING_HEREDOC>\\		{ Buffer::Append("\\"); }
-<STRING_HEREDOC>[^\\\"\$\{] 				{ Buffer::Append(yytext); }
+<STRING_HEREDOC>[^\\\"\$\{]+ 				{ Buffer::Append(yytext); }
 
 
 
@@ -223,6 +223,7 @@ VAR         [Vv][Aa][Rr]
 <INSERTED_PHP,PURE_PHP>{ENDWHILE}     { Console::Log(yylineno, yytext, "keyword ENDWHILE"); }
 <INSERTED_PHP,PURE_PHP>{ENDSWITCH}    { Console::Log(yylineno, yytext, "keyword ENDSWITCH"); }
 <INSERTED_PHP,PURE_PHP>{ENDFOR}       { Console::Log(yylineno, yytext, "keyword ENDFOR"); }
+<INSERTED_PHP,PURE_PHP>{ENDIF}       { Console::Log(yylineno, yytext, "keyword ENDIF"); }
 <INSERTED_PHP,PURE_PHP>{FOREACH}      { Console::Log(yylineno, yytext, "keyword FOREACH"); }
 <INSERTED_PHP,PURE_PHP>{INSTANCEOF}   { Console::Log(yylineno, yytext, "keyword INSTANCEOF"); }
 <INSERTED_PHP,PURE_PHP>{PROTECTED}    { Console::Log(yylineno, yytext, "keyword PROTECTED"); }
@@ -241,13 +242,17 @@ VAR         [Vv][Aa][Rr]
 <INSERTED_PHP,PURE_PHP>{CLASS}        { Console::Log(yylineno, yytext, "keyword CLASS"); }
 <INSERTED_PHP,PURE_PHP>{WHILE}        { Console::Log(yylineno, yytext, "keyword WHILE"); }
 <INSERTED_PHP,PURE_PHP>{ELSE}         { Console::Log(yylineno, yytext, "keyword ELSE"); }
+<INSERTED_PHP,PURE_PHP>{CASE}         { Console::Log(yylineno, yytext, "keyword CASE"); }
+<INSERTED_PHP,PURE_PHP>{ECHO}         { Console::Log(yylineno, yytext, "keyword ECHO"); }
 <INSERTED_PHP,PURE_PHP>{AND}          { Console::Log(yylineno, yytext, "keyword AND"); }
 <INSERTED_PHP,PURE_PHP>{XOR}          { Console::Log(yylineno, yytext, "keyword XOR"); }
 <INSERTED_PHP,PURE_PHP>{NEW}          { Console::Log(yylineno, yytext, "keyword NEW"); }
 <INSERTED_PHP,PURE_PHP>{VAR}          { Console::Log(yylineno, yytext, "keyword VAR"); }
+<INSERTED_PHP,PURE_PHP>{FOR}          { Console::Log(yylineno, yytext, "keyword FOR"); }
 <INSERTED_PHP,PURE_PHP>{OR}           { Console::Log(yylineno, yytext, "keyword OR"); }
 <INSERTED_PHP,PURE_PHP>{AS}           { Console::Log(yylineno, yytext, "keyword AS"); }
 <INSERTED_PHP,PURE_PHP>{IF}           { Console::Log(yylineno, yytext, "keyword IF"); }
+<INSERTED_PHP,PURE_PHP>{DO}           { Console::Log(yylineno, yytext, "keyword DO"); }
 
 <PURE_PHP>array			{ Console::Log(yylineno, yytext, "type array"); }
 <PURE_PHP>callable		{ Console::Log(yylineno, yytext, "type callable"); }
