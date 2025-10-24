@@ -156,6 +156,7 @@ VAR         [Vv][Aa][Rr]
 									Buffer::Append(yytext);
 									Console::Log(Buffer::GetStartLine(), yylineno, Buffer::Current(), "multiline comment");
 									Buffer::Reset();
+									Buffer::SetStartLine(yylineno);
 									BEGIN(State::PopAndPeek()); 
 								}
 
@@ -169,6 +170,7 @@ VAR         [Vv][Aa][Rr]
 <STRING_SINGLE_QUOTES>\'			{
 										Console::Log(Buffer::GetStartLine(), yylineno, Buffer::Current(), "string in STRING_SINGLE_QUOTES");
 										Buffer::Reset();
+										Buffer::SetStartLine(yylineno);
 										BEGIN(State::PopAndPeek());
 									}
 
@@ -178,7 +180,7 @@ VAR         [Vv][Aa][Rr]
 
 <STRING_HEREDOC_OR_NOWDOC>\'{ID}\'\n    { 
 											State::PopAndPeek();  
-											Buffer::Reset(); 
+											Buffer::Reset();
 											Buffer::SetDocId(yytext+1, 2); 
 											Buffer::SetStartLine(yylineno); 
 											Console::Log(yylineno, Buffer::GetDocId(), "start of STRING_NOWDOC");
@@ -198,9 +200,10 @@ VAR         [Vv][Aa][Rr]
 														Buffer::Append(yytext);
 													}
 													else {
-														Console::Log(Buffer::GetStartLine(), yylineno, Buffer::Current(), "text in STRING_NOWDOC/STRING_HEREDOC");
-														Console::Log(yylineno, Buffer::GetDocId(), "end of STRING_NOWDOC/STRING_HEREDOC");
+														Console::Log(Buffer::GetStartLine(), yylineno-2, Buffer::Current(), "text in STRING_NOWDOC/STRING_HEREDOC");
+														Console::Log(yylineno-1, Buffer::GetDocId(), "end of STRING_NOWDOC/STRING_HEREDOC");
 														Buffer::Reset();
+														Buffer::SetStartLine(yylineno);
 														BEGIN(State::PopAndPeek());
 													}
 												}
@@ -224,12 +227,14 @@ VAR         [Vv][Aa][Rr]
 														Console::Log(yylineno, "$", "operator \"$\" inside STRING_DOUBLE_QUOTES/STRING_HEREDOC");
 														Console::Log(yylineno, yytext+1, "identifier inside STRING_DOUBLE_QUOTES/STRING_HEREDOC");
 														Buffer::Reset();
+														Buffer::SetStartLine(yylineno);
 													}
 <STRING_DOUBLE_QUOTES,STRING_HEREDOC>\${ID}\[		{
 														Console::Log(Buffer::GetStartLine(), yylineno, Buffer::Current(), "string inside STRING_DOUBLE_QUOTES/STRING_HEREDOC");
 														Console::Log(yylineno, "$", "operator \"$\" inside STRING_DOUBLE_QUOTES/STRING_HEREDOC");
 														Console::Log(yylineno, Buffer::CutStringEnd(yytext+1, 1), "identifier inside STRING_DOUBLE_QUOTES/STRING_HEREDOC");
 														Buffer::Reset();
+														Buffer::SetStartLine(yylineno);
 														Console::Log(yylineno, "[", "operator [");
 														BEGIN(State::PushAndPeek(ARRAY_CONTENT));
 														
@@ -240,6 +245,7 @@ VAR         [Vv][Aa][Rr]
 														Console::Log(yylineno, "{", "operator { inside STRING_DOUBLE_QUOTES/STRING_HEREDOC before INTERPOLATED_PHP");
 														Console::Log(yylineno, "$", "operator $ inside INTERPOLATED_PHP");
 														Buffer::Reset();
+														Buffer::SetStartLine(yylineno);
 														BEGIN(State::PushAndPeek(INTERPOLATED_PHP));
 													}
 <STRING_DOUBLE_QUOTES,STRING_HEREDOC>\$\{\$ 		{
@@ -248,6 +254,7 @@ VAR         [Vv][Aa][Rr]
 														Console::Log(yylineno, "{", "operator { inside STRING_DOUBLE_QUOTES/STRING_HEREDOC before INTERPOLATED_PHP");
 														Console::Log(yylineno, "$", "operator \"$\" inside INTERPOLATED_PHP");
 														Buffer::Reset();
+														Buffer::SetStartLine(yylineno);
 														BEGIN(State::PushAndPeek(INTERPOLATED_PHP));
 													}
 
