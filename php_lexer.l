@@ -374,6 +374,7 @@ VAR         [Vv][Aa][Rr]
 
 <INITIAL>.*		;
 
+<*>.			{ Console::Error("unrecognized symbol '" + Buffer::CutStringEnd(yytext, 0) + "'", yylineno); }
 
 %%
 
