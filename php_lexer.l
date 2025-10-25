@@ -156,9 +156,9 @@ VAR         [Vv][Aa][Rr]
                                         }
 
 <STRING_NOWDOC>\n+		    { buffer->append(yytext); }
-<STRING_NOWDOC>[^\s\n]+		{ buffer->append(yytext); }
+<STRING_NOWDOC>[^\n]+		{ buffer->append(yytext); }
 
-<PURE_PHP,ARRAY_CONTENT>"\""			{  BEGIN(states->pushAndPeek(STRING_DOUBLE_QUOTES)); buffer->reset(); buffer->setStartLine(yylineno); }
+<PURE_PHP,ARRAY_CONTENT>"\""			{ BEGIN(states->pushAndPeek(STRING_DOUBLE_QUOTES)); buffer->reset(); buffer->setStartLine(yylineno); }
 
 <STRING_DOUBLE_QUOTES>\n			 	{ Console::Error("new line in STRING_DOUBLE_QUOTES", yylineno); }
 
