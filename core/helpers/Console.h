@@ -9,21 +9,23 @@ using std::string;
 
 class Console {
 public:
-    static void LogHeader(string title);
+    static void Header(string title);
 
     static void Log(string message);
 
-    static void Log(int line, string content, string info);
+    static void Error(string message);
 
-    static void Log(int line, int content, string info);
+    static void LexLog(int line, string content, string info);
 
-    static void Log(int line, double content, string info);
+    static void LexLog(int line, int content, string info);
 
-    static void Log(int line, string content, string info, bool isSecondaryColor);
+    static void LexLog(int line, double content, string info);
 
-    static void Log(int lineStart, int lineEnd, string content, string info);
+    static void LexLog(int line, string content, string info, bool isSecondaryColor);
 
-    static void Error(string message, int line);
+    static void LexLog(int lineStart, int lineEnd, string content, string info);
+
+    static void LexError(string message, int line);
 };
 
 #endif //PHP_COMPILER_CONSOLE_H
