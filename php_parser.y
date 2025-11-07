@@ -275,9 +275,7 @@ class_member_declaration : class_const_elements
 						 ;
 
 class_const_elements : CONST const_elements ';'
-					 | PUBLIC CONST const_elements ';'
-					 | PROTECTED CONST const_elements ';'
-					 | PRIVATE CONST const_elements ';'
+					 | visibility_modifiers CONST const_elements ';'
 					 ;
 
 const_elements : const_element
@@ -286,18 +284,20 @@ const_elements : const_element
 			   
 const_element : ID '=' expression
 			  ;
+
+visibility_modifiers : PUBLIC
+                     | PROTECTED
+                     | PRIVATE
+                     ;
+
+declaration_modifiers : visibility_modifiers
+                      | visibility_modifiers STATIC
+                      | STATIC visibility_modifiers
+                      | STATIC
+                      ;
 			   
 property_declaration : VAR property_elements ';'
-					 | PUBLIC property_elements	';'
-					 | PROTECTED property_elements ';'
-					 | PRIVATE property_elements ';'
-					 | PUBLIC STATIC property_elements ';'
-					 | PROTECTED STATIC property_elements ';'
-					 | PRIVATE STATIC property_elements ';'
-					 | STATIC property_elements ';'
-					 | STATIC PUBLIC property_elements ';'
-					 | STATIC PROTECTED property_elements ';'
-					 | STATIC PRIVATE property_elements ';'
+					 | declaration_modifiers property_elements	';'
 					 ;
 					 
 property_elements : property_element
@@ -309,16 +309,7 @@ property_element : '$' ID
 				 ;
 				
 method_declaration : function_definition
-				   | PUBLIC function_definition
-				   | PROTECTED function_definition
-				   | PRIVATE function_definition
-				   | PUBLIC STATIC function_definition
-				   | PROTECTED STATIC function_definition
-				   | PRIVATE STATIC function_definition
-				   | STATIC function_definition
-				   | STATIC PUBLIC function_definition
-				   | STATIC PROTECTED function_definition
-				   | STATIC PRIVATE function_definition
+				   | declaration_modifiers function_definition
 				   ;
 
 %%
