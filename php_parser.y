@@ -114,8 +114,8 @@ expression : expression LOGIC_OR_2 expression
 		   | expression POW expression
 		   | expression PROPERTY_ACCESS expression
 		   | expression STATIC_PROPERTY_ACCESS expression
-		   | '$' expression_variable
-		   | expression KEY_ACCESS expression
+		   | '$' expression
+		   | '[' array_element_list ']'
 		   | expression '[' expression ']'
 		   | expression '[' ']'
 		   | '(' expression ')'
@@ -129,11 +129,16 @@ expression : expression LOGIC_OR_2 expression
 		   | BOOL
 		   | NIL
 		   ;
-		   
-expression_variable : '$' expression_variable
-					| ID
-					;
-				   
+
+array_element_list : array_element
+                   | array_element_list ',' array_element
+                   ;
+
+array_element : STRING KEY_ACCESS expression
+              | INT KEY_ACCESS expression
+              | expression
+              ;
+
 expression_list : expression
 				| expression_list ',' expression
 				;
