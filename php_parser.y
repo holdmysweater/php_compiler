@@ -199,17 +199,19 @@ foreach_statement : FOREACH '(' expression AS '$' ID KEY_ACCESS '$' ID ')' state
 				  | FOREACH '(' expression AS expression ')' ':' statement_list ENDFOREACH ';'
 				  ;
 				  
-if_statement : IF '(' expression ')' statement elseif_statements_1 else_statement_empty
-			 | IF '(' expression ')' statement else_statement_empty
-			 | IF '(' expression ')' ':' statement_list elseif_statements_2 ELSE ':' statement_list ENDIF ';'
-			 | IF '(' expression ')' ':' statement_list elseif_statements_2 ENDIF ';'
-			 | IF '(' expression ')' ':' statement_list ELSE ':' statement_list ENDIF ';'
-			 | IF '(' expression ')' ':' statement_list ENDIF ';'
+if_statement : IF '(' expression ')' statement else_statement_empty_1
+             | IF '(' expression ')' statement elseif_statements_1 else_statement_empty_1
+			 | IF '(' expression ')' ':' statement_list else_statement_empty_2 ENDIF ';'
+			 | IF '(' expression ')' ':' statement_list elseif_statements_2 else_statement_empty_2 ENDIF ';'
 			 ;
 
-else_statement_empty : /* empty */
-                     | ELSE statement
-                     ;
+else_statement_empty_1 : /* empty */
+                       | ELSE statement
+                       ;
+
+else_statement_empty_2 : /* empty */
+                       | ELSE ':' statement_list
+                       ;
 
 elseif_statements_1 : elseif_statement_1
 					| elseif_statements_1 elseif_statement_1
