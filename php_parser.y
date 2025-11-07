@@ -134,8 +134,7 @@ array_element_list : array_element
                    | array_element_list ',' array_element
                    ;
 
-array_element : STRING KEY_ACCESS expression
-              | INT KEY_ACCESS expression
+array_element : expression KEY_ACCESS expression
               | expression
               ;
 
