@@ -144,40 +144,29 @@ expression_list : expression
 				;
 						  
 		
-statement : compound_statement
-		  | expression_statement
+statement : '{' statement_list_empty '}'
+		  | expression ';'
 		  | while_statement
 		  | for_statement
 		  | foreach_statement
 		  | if_statement
 		  | switch_statement
-		  | echo_statement
-		  | return_statement
-		  | jump_statement
+		  | ECHO expression_list ';'
+		  | RETURN expression ';'
+          | RETURN ';'
+		  | BREAK ';'
+          | CONTINUE ';'
 		  | ';'
 		  ;
-		  
-compound_statement : '{' statement_list '}'
-				   | '{' '}'
-				   ;
-				   
-expression_statement : expression ';'
-					 ;
-
-echo_statement : ECHO expression_list ';'
-			   ;
-			   
-return_statement : RETURN expression ';'
-				 | RETURN ';'
-				 ;
-				 
-jump_statement : BREAK ';'
-			   | CONTINUE ';'
 
 statement_list : statement
 			   | statement_list statement
 			   ;
-				 
+
+statement_list_empty : /* empty */
+                     | statement_list
+                     ;
+
 			   
 while_statement : WHILE '(' expression ')' statement
 				| WHILE '(' expression ')' ':' statement_list ENDWHILE ';'
@@ -250,7 +239,7 @@ case_statement : CASE expression ':' statement_list
 			   | DEFAULT ';'
 			   ;
 
-function_definition : function_definition_header compound_statement
+function_definition : function_definition_header '{' statement_list_empty '}'
 					;
 					
 function_definition_header : FUNCTION ID '(' parameter_function_list ')'
