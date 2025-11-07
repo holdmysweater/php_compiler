@@ -234,19 +234,27 @@ function_definition : function_definition_header '{' statement_list_empty '}'
 					;
 					
 function_definition_header : FUNCTION ID '(' parameter_function_list ')'
-						   | FUNCTION ID '(' parameter_function_list ')' ':' TYPE
+						   | FUNCTION ID '(' parameter_function_list ')' ':' type_list
 						   | FUNCTION ID '(' ')'
-						   | FUNCTION ID '(' ')' ':' TYPE
+						   | FUNCTION ID '(' ')' ':' type_list
 						   ;
-					
+
+type_list : type
+          | type_list '|' type
+          ;
+
+type : TYPE
+     | ID
+     ;
+
 parameter_function_list : parameter_function
 						| parameter_function_list ',' parameter_function
 						;
 						
 parameter_function : '$' ID
 				   | '$' ID '=' expression
-				   | TYPE '$' ID
-				   | TYPE '$' ID '=' expression
+				   | type_list '$' ID
+				   | type_list '$' ID '=' expression
 				   ;
 				   
 
