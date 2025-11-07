@@ -142,6 +142,10 @@ array_element : STRING KEY_ACCESS expression
 expression_list : expression
 				| expression_list ',' expression
 				;
+
+expression_list_empty : /* empty */
+				      | expression_list
+				      ;
 						  
 		
 statement : '{' statement_list_empty '}'
@@ -173,22 +177,8 @@ while_statement : WHILE '(' expression ')' statement
 				| DO statement WHILE '(' expression ')' ';'
 				;
 			 
-for_statement : FOR '(' expression_list ';' expression_list ';' expression_list ')' statement
-			  | FOR '(' ';' expression_list ';' expression_list ')' statement
-			  | FOR '(' expression_list ';' ';' expression_list ')' statement
-			  | FOR '(' expression_list ';' expression_list ';' ')' statement
-			  | FOR '(' ';' ';' expression_list ')' statement
-			  | FOR '(' expression_list ';' ';' ')' statement
-			  | FOR '(' ';' expression_list ';' ')' statement
-			  | FOR '(' ';' ';' ')' statement
-			  | FOR '(' expression_list ';' expression_list ';' expression_list ')' ':' statement_list	ENDFOR ';'
-			  | FOR '(' ';' expression_list ';' expression_list ')' ':' statement_list ENDFOR ';'
-			  | FOR '(' expression_list ';' ';' expression_list ')' ':' statement_list ENDFOR ';'
-			  | FOR '(' expression_list ';' expression_list ';' ')' ':' statement_list ENDFOR ';'
-			  | FOR '(' ';' ';' expression_list ')' ':' statement_list ENDFOR ';'
-			  | FOR '(' expression_list ';' ';' ')' ':' statement_list ENDFOR ';'
-			  | FOR '(' ';' expression_list ';' ')' ':' statement_list ENDFOR ';'
-			  | FOR '(' ';' ';' ')' ':' statement_list ENDFOR ';'
+for_statement : FOR '(' expression_list_empty ';' expression_list_empty ';' expression_list_empty ')' statement
+			  | FOR '(' expression_list_empty ';' expression_list_empty ';' expression_list_empty ')' ':' statement_list ENDFOR ';'
 			  ;
 			   
 foreach_statement : FOREACH '(' expression AS expression ')' statement
