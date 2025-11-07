@@ -180,7 +180,9 @@ for_statement : FOR '(' expression_list_empty ';' expression_list_empty ';' expr
 			  | FOR '(' expression_list_empty ';' expression_list_empty ';' expression_list_empty ')' ':' statement_list ENDFOR ';'
 			  ;
 			   
-foreach_statement : FOREACH '(' expression AS expression ')' statement
+foreach_statement : FOREACH '(' expression AS '$' ID KEY_ACCESS '$' ID ')' statement
+                  | FOREACH '(' expression AS expression ')' statement
+				  | FOREACH '(' expression AS '$' ID KEY_ACCESS '$' ID ')' ':' statement_list ENDFOREACH ';'
 				  | FOREACH '(' expression AS expression ')' ':' statement_list ENDFOREACH ';'
 				  ;
 				  
