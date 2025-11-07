@@ -13,6 +13,7 @@
 %token <id_const> ID
 %token <type_const> TYPE
 
+%token HTML_CONTENT
 %token NIL
 %token CONST
 %token CLASS
@@ -72,19 +73,31 @@
 
 %%
 
-program : START_TAG program_list END_TAG
-		| START_TAG END_TAG
-		| error
-		;
-		
-program_list : program_element
-			 | program_list program_element
-			 ;
+program : /* empty */
+        | mixed_content_list
+        ;
+
+mixed_content_list : mixed_content_element
+                   | mixed_content_list mixed_content_element
+                   ;
+
+mixed_content_element : HTML_CONTENT
+                      | php_content
+                      ;
+
+php_content : START_TAG php_program_list END_TAG
+            | START_TAG END_TAG
+            | error
+            ;
+
+php_program_list : php_program_element
+			     | php_program_list php_program_element
+			     ;
 			 
-program_element : statement
-				| function_definition
-				| class_declaration
-				;
+php_program_element : statement
+				    | function_definition
+				    | class_declaration
+				    ;
 
 expression : expression LOGIC_OR_2 expression
 		   | expression LOGIC_XOR expression
