@@ -237,23 +237,17 @@ case_statements : case_statement
 				| case_statements case_statement
 				;
 				 
-case_statement : CASE expression ':' statement_list
-			   | CASE expression ':'
-			   | CASE expression ';' statement_list
-			   | CASE expression ';'
-			   | DEFAULT ':' statement_list
-			   | DEFAULT ':'
-			   | DEFAULT ';' statement_list
-			   | DEFAULT ';'
+case_statement : CASE expression ':' statement_list_empty
+			   | CASE expression ';' statement_list_empty
+			   | DEFAULT ':' statement_list_empty
+			   | DEFAULT ';' statement_list_empty
 			   ;
 
 function_definition : function_definition_header '{' statement_list_empty '}'
 					;
 					
-function_definition_header : FUNCTION ID '(' parameter_function_list ')'
-						   | FUNCTION ID '(' parameter_function_list ')' ':' type_list
-						   | FUNCTION ID '(' ')'
-						   | FUNCTION ID '(' ')' ':' type_list
+function_definition_header : FUNCTION ID '(' parameter_function_list_empty ')'
+						   | FUNCTION ID '(' parameter_function_list_empty ')' ':' type_list
 						   ;
 
 type_list : type
@@ -264,6 +258,10 @@ type : TYPE
      | ID
      ;
 
+parameter_function_list_empty : /* empty */
+						      | parameter_function_list
+						      ;
+
 parameter_function_list : parameter_function
 						| parameter_function_list ',' parameter_function
 						;
@@ -273,14 +271,15 @@ parameter_function : '$' ID
 				   | type_list '$' ID
 				   | type_list '$' ID '=' expression
 				   ;
-				   
 
 
-class_declaration : CLASS ID '{' class_member_declarations '}'
-				  | CLASS ID '{' '}'
-				  | CLASS ID EXTENDS ID '{' class_member_declarations '}'
-				  | CLASS ID EXTENDS ID '{' '}'
+class_declaration : CLASS ID '{' class_member_declarations_empty '}'
+				  | CLASS ID EXTENDS ID '{' class_member_declarations_empty '}'
 				  ;
+
+class_member_declarations_empty : /* empty */
+						        | class_member_declarations
+						        ;
 
 class_member_declarations : class_member_declaration
 						  | class_member_declarations class_member_declaration
