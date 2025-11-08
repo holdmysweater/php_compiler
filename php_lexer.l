@@ -137,12 +137,11 @@ VAR         [Vv][Aa][Rr]
 								}
 
 <PURE_PHP,ECHO_PHP,ARRAY_CONTENT>\'	{ BEGIN(states->pushAndPeek(STRING_SINGLE_QUOTES)); buffer->reset(); buffer->setStartLine(yylineno); }
-<STRING_SINGLE_QUOTES>\n			{ Console::LexError("new line in STRING_SINGLE_QUOTES", yylineno); }
 <STRING_SINGLE_QUOTES>\\\n			{ buffer->append(yytext); }
 <STRING_SINGLE_QUOTES>\\\'			{ buffer->append("\'"); }
 <STRING_SINGLE_QUOTES>\\\\     		{ buffer->append("\\"); }
 <STRING_SINGLE_QUOTES>\\[^\\\']     { buffer->append(yytext); }
-<STRING_SINGLE_QUOTES>[^\\\'\n]+	{ buffer->append(yytext); }
+<STRING_SINGLE_QUOTES>[^\\\']+	{ buffer->append(yytext); }
 <STRING_SINGLE_QUOTES>\'			{
 										Console::LexLog(buffer->getStartLine(), yylineno, buffer->current(), "string in STRING_SINGLE_QUOTES");
 										buffer->reset();
@@ -189,9 +188,7 @@ VAR         [Vv][Aa][Rr]
 
 <PURE_PHP,ECHO_PHP,ARRAY_CONTENT>"\""	{ BEGIN(states->pushAndPeek(STRING_DOUBLE_QUOTES)); buffer->reset(); buffer->setStartLine(yylineno); }
 
-<STRING_DOUBLE_QUOTES>\n			 	{ Console::LexError("new line in STRING_DOUBLE_QUOTES", yylineno); }
-
-<STRING_DOUBLE_QUOTES>[^\\\"\$\{\n]+	{ buffer->append(yytext); }
+<STRING_DOUBLE_QUOTES>[^\\\"\$\{]+	{ buffer->append(yytext); }
 
 <STRING_HEREDOC>[^\\\$\{]				{ buffer->append(yytext); }
 
@@ -346,9 +343,10 @@ VAR         [Vv][Aa][Rr]
 <PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>{NUMBER_FLOAT}	{ Console::LexLog(yylineno, atof(yytext), "value NUMBER_FLOAT"); }
 <PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>{NUMBER_EXPONENT}	{ Console::LexLog(yylineno, atof(yytext), "value NUMBER_EXPONENT"); }
 
-<INITIAL,PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>[ \t\n]+	;
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>[ \t\n]+	;
 
-<INITIAL>.	    { html->append(yytext); }
+<INITIAL>[^<]*	{ html->append(yytext); }
+<INITIAL>\<	    { html->append(yytext); }
 
 <*>.			{ Console::LexError("unrecognized symbol '" + Buffer::CutStringEnd(yytext, 0) + "'", yylineno); }
 
