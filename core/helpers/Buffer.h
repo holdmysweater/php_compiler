@@ -1,6 +1,8 @@
 #ifndef PHP_COMPILER_BUFFER_H
 #define PHP_COMPILER_BUFFER_H
 
+#define CONSOLE_LOG_ENABLED
+
 #include <sstream>
 
 using std::string;

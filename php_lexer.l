@@ -63,11 +63,14 @@ VAR         [Vv][Aa][Rr]
 %x STRING_NOWDOC
 %x ARRAY_CONTENT
 %x ECHO_PHP
+%x INDENT_SET_HEREDOC_OR_NOWDOC
+%x INDENT_CHECK_HEREDOC_OR_NOWDOC
 
 %{
 	#include "core/helpers/Console.h"
 	#include "core/helpers/StatesTree.h"
 	#include "core/helpers/Buffer.h"
+	#include "core/helpers/IndentationTracker.h"
 %}
 
 %%
@@ -77,6 +80,7 @@ VAR         [Vv][Aa][Rr]
 
 	Buffer* buffer = new Buffer();
 	Buffer* html = new Buffer();
+	IndentationTracker* indents = new IndentationTracker();
 	StatesTree* states = new StatesTree();
 
 	BEGIN(states->pushAndPeek(INITIAL));
@@ -157,20 +161,34 @@ VAR         [Vv][Aa][Rr]
 											states->popAndPeek();  
 											buffer->reset();
 											buffer->setDocId(yytext+1, 2); 
-											buffer->setStartLine(yylineno); 
+											buffer->setStartLine(yylineno);
+                                            indents->reset();
 											Console::LexLog(yylineno-1, "<<<'" + buffer->getDocId() + "'", "start of STRING_NOWDOC");
 											BEGIN(states->pushAndPeek(STRING_NOWDOC)); 
+											BEGIN(states->pushAndPeek(INDENT_SET_HEREDOC_OR_NOWDOC)); 
 										}
 <STRING_HEREDOC_OR_NOWDOC>{ID}\n    	{ 
 											states->popAndPeek();  
 											buffer->reset(); 
 											buffer->setDocId(yytext, 1); 
 											buffer->setStartLine(yylineno); 
+                                            indents->reset();
 											Console::LexLog(yylineno-1, "<<<" + buffer->getDocId(), "start of STRING_HEREDOC");
 											BEGIN(states->pushAndPeek(STRING_HEREDOC)); 
+                                            BEGIN(states->pushAndPeek(INDENT_SET_HEREDOC_OR_NOWDOC)); 
 										}
 
-<STRING_NOWDOC,STRING_HEREDOC>^{ID};	{
+<INDENT_SET_HEREDOC_OR_NOWDOC>[\t ]*    { indents->set(yytext); BEGIN(states->popAndPeek()); }
+
+<INDENT_CHECK_HEREDOC_OR_NOWDOC>[\t ]*  { 
+                                            if (!indents->isValid(yytext)) {
+                                                Console::LexError("unmatching heredoc/nowdoc indent", yylineno);
+                                            }
+                                            buffer->append(indents->getContent(yytext));
+                                            BEGIN(states->popAndPeek()); 
+                                        }
+
+<STRING_NOWDOC,STRING_HEREDOC>{ID};	    {
                                             if (string(yytext, strcspn(yytext, ";")) != buffer->getDocId()) {
                                                 buffer->append(yytext);
                                             }
@@ -183,8 +201,9 @@ VAR         [Vv][Aa][Rr]
                                             }
                                         }
 
-<STRING_NOWDOC>\n+		    { buffer->append(yytext); }
-<STRING_NOWDOC>[^\n]+		{ buffer->append(yytext); }
+<STRING_NOWDOC>[^\n]+                   { buffer->append(yytext); }
+
+<STRING_NOWDOC,STRING_HEREDOC>\n+		{ buffer->append(yytext); BEGIN(states->pushAndPeek(INDENT_CHECK_HEREDOC_OR_NOWDOC)); }
 
 <PURE_PHP,ECHO_PHP,ARRAY_CONTENT>"\""	{ BEGIN(states->pushAndPeek(STRING_DOUBLE_QUOTES)); buffer->reset(); buffer->setStartLine(yylineno); }
 

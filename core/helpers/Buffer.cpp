@@ -1,4 +1,6 @@
 #include "Buffer.h"
+#include "Console.h"
+#include "Color.h"
 
 string Buffer::current() {
     return _buffer;
@@ -9,6 +11,9 @@ void Buffer::reset() {
 }
 
 void Buffer::append(string text) {
+#ifdef CONSOLE_LOG_ENABLED
+    Console::Log(Color::Grey() + "%Buffer% Appended: '" + text + "'");
+#endif
     _buffer += text;
 }
 

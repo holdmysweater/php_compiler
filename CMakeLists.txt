@@ -23,6 +23,7 @@ set(CORE_SOURCES
         core/helpers/Color.cpp
         core/helpers/Buffer.cpp
         core/helpers/StatesTree.cpp
+        core/helpers/IndentationTracker.cpp
 )
 
 set(MAIN_SOURCES
