@@ -1,31 +1,44 @@
 #ifndef PHP_COMPILER_BUFFER_H
 #define PHP_COMPILER_BUFFER_H
 
-#include <sstream>
+#define CONSOLE_BUFFER_LOG_ENABLED
 
+#include "IndentTracker.h"
+
+#include <string>
+#include <vector>
+
+using std::vector;
 using std::string;
 
 class Buffer {
-    string _buffer;
+    vector<string> _text;
+    IndentTracker _indentTracker = IndentTracker();
     string _docId;
     int _startLine = -1;
 
 public:
     static string CutStringEnd(string str, int count);
 
-    string current();
-
-    void reset();
-
-    void append(string text);
-
     void setStartLine(int line);
 
-    int getStartLine();
+    int getStartLine() const;
 
     void setDocId(string id, int erase = 0);
 
-    string getDocId();
+    string getDocId() const;
+
+    void append(string str);
+
+    void appendNewLines(string newLines);
+
+    string pop();
+
+    void reset();
+
+    int validateByLastLineAsIndent();
+
+    string current() const;
 };
 
 #endif //PHP_COMPILER_BUFFER_H
