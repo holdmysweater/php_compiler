@@ -83,13 +83,19 @@ VAR         [Vv][Aa][Rr]
 %}
 
 \<\?=		            { 
-                            Console::LexLog(html->getStartLine(), yylineno, html->current(), "html content");
+                            if (!html->current().empty()) {
+                                Console::LexLog(html->getStartLine() > 0 ? html->getStartLine() : 1, yylineno, html->current(), "html content"); 
+                            }
+
                             Console::LexLog(yylineno, yytext, "opening echo php tag"); 
-                            BEGIN(states->pushAndPeek(ECHO_PHP)); 
+                            BEGIN(states->pushAndPeek(ECHO_PHP));
                         }
 
 \<\?([pP][hH][pP])?		{ 
-                            Console::LexLog(html->getStartLine(), yylineno, html->current(), "html content");
+                            if (!html->current().empty()) {
+                                Console::LexLog(html->getStartLine() > 0 ? html->getStartLine() : 1, yylineno, html->current(), "html content"); 
+                            }
+
                             Console::LexLog(yylineno, yytext, "opening php tag"); 
                             BEGIN(states->pushAndPeek(PURE_PHP)); 
                         }
