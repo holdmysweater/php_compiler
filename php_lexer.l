@@ -158,7 +158,7 @@ VAR         [Vv][Aa][Rr]
 											buffer->reset();
 											buffer->setDocId(yytext+1, 2); 
 											buffer->setStartLine(yylineno); 
-											Console::LexLog(yylineno, buffer->getDocId(), "start of STRING_NOWDOC");
+											Console::LexLog(yylineno-1, "<<<'" + buffer->getDocId() + "'", "start of STRING_NOWDOC");
 											BEGIN(states->pushAndPeek(STRING_NOWDOC)); 
 										}
 <STRING_HEREDOC_OR_NOWDOC>{ID}\n    	{ 
@@ -166,17 +166,17 @@ VAR         [Vv][Aa][Rr]
 											buffer->reset(); 
 											buffer->setDocId(yytext, 1); 
 											buffer->setStartLine(yylineno); 
-											Console::LexLog(yylineno, buffer->getDocId(), "start of STRING_HEREDOC");
+											Console::LexLog(yylineno-1, "<<<" + buffer->getDocId(), "start of STRING_HEREDOC");
 											BEGIN(states->pushAndPeek(STRING_HEREDOC)); 
 										}
 
-<STRING_NOWDOC,STRING_HEREDOC>^{ID};\n	{
+<STRING_NOWDOC,STRING_HEREDOC>^{ID};	{
                                             if (string(yytext, strcspn(yytext, ";")) != buffer->getDocId()) {
                                                 buffer->append(yytext);
                                             }
                                             else {
-                                                Console::LexLog(buffer->getStartLine(), yylineno-2, buffer->current(), "text in STRING_NOWDOC/STRING_HEREDOC");
-                                                Console::LexLog(yylineno-1, buffer->getDocId(), "end of STRING_NOWDOC/STRING_HEREDOC");
+                                                Console::LexLog(buffer->getStartLine(), yylineno-1, buffer->current(), "text in STRING_NOWDOC/STRING_HEREDOC");
+                                                Console::LexLog(yylineno, buffer->getDocId() + ";", "end of STRING_NOWDOC/STRING_HEREDOC");
                                                 buffer->reset();
                                                 buffer->setStartLine(yylineno);
                                                 BEGIN(states->popAndPeek());
