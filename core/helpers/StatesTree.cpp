@@ -63,6 +63,7 @@ string StatesTree::StateCodeToString(int state) {
         case 8: return "STRING_HEREDOC";
         case 9: return "STRING_NOWDOC";
         case 10: return "ARRAY_CONTENT";
+        case 11: return "ECHO_PHP";
         default: return "UNKNOWN";
     }
 }
