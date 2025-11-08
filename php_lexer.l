@@ -63,14 +63,12 @@ VAR         [Vv][Aa][Rr]
 %x STRING_NOWDOC
 %x ARRAY_CONTENT
 %x ECHO_PHP
-%x INDENT_SET_HEREDOC_OR_NOWDOC
-%x INDENT_CHECK_HEREDOC_OR_NOWDOC
+%x INDENT_HEREDOC_OR_NOWDOC
 
 %{
 	#include "core/helpers/Console.h"
 	#include "core/helpers/StatesTree.h"
 	#include "core/helpers/Buffer.h"
-	#include "core/helpers/IndentationTracker.h"
 %}
 
 %%
@@ -80,7 +78,6 @@ VAR         [Vv][Aa][Rr]
 
 	Buffer* buffer = new Buffer();
 	Buffer* html = new Buffer();
-	IndentationTracker* indents = new IndentationTracker();
 	StatesTree* states = new StatesTree();
 
 	BEGIN(states->pushAndPeek(INITIAL));
@@ -162,37 +159,52 @@ VAR         [Vv][Aa][Rr]
 											buffer->reset();
 											buffer->setDocId(yytext+1, 2); 
 											buffer->setStartLine(yylineno);
-                                            indents->reset();
 											Console::LexLog(yylineno-1, "<<<'" + buffer->getDocId() + "'", "start of STRING_NOWDOC");
 											BEGIN(states->pushAndPeek(STRING_NOWDOC)); 
-											BEGIN(states->pushAndPeek(INDENT_SET_HEREDOC_OR_NOWDOC)); 
+											BEGIN(states->pushAndPeek(INDENT_HEREDOC_OR_NOWDOC)); 
 										}
 <STRING_HEREDOC_OR_NOWDOC>{ID}\n    	{ 
 											states->popAndPeek();  
 											buffer->reset(); 
 											buffer->setDocId(yytext, 1); 
-											buffer->setStartLine(yylineno); 
-                                            indents->reset();
+											buffer->setStartLine(yylineno);
 											Console::LexLog(yylineno-1, "<<<" + buffer->getDocId(), "start of STRING_HEREDOC");
 											BEGIN(states->pushAndPeek(STRING_HEREDOC)); 
-                                            BEGIN(states->pushAndPeek(INDENT_SET_HEREDOC_OR_NOWDOC)); 
+                                            BEGIN(states->pushAndPeek(INDENT_HEREDOC_OR_NOWDOC)); 
 										}
 
-<INDENT_SET_HEREDOC_OR_NOWDOC>[\t ]*    { indents->set(yytext); BEGIN(states->popAndPeek()); }
+<INDENT_HEREDOC_OR_NOWDOC>[\t ]+  { buffer->append(yytext); BEGIN(states->popAndPeek()); }
+<INDENT_HEREDOC_OR_NOWDOC>\n+     { buffer->appendNewLines(yytext); BEGIN(states->popAndPeek()); }
+<INDENT_HEREDOC_OR_NOWDOC>.?      { buffer->append(yytext); BEGIN(states->popAndPeek()); }
 
-<INDENT_CHECK_HEREDOC_OR_NOWDOC>[\t ]*  { 
-                                            if (!indents->isValid(yytext)) {
-                                                Console::LexError("unmatching heredoc/nowdoc indent", yylineno);
-                                            }
-                                            buffer->append(indents->getContent(yytext));
-                                            BEGIN(states->popAndPeek()); 
+<INDENT_HEREDOC_OR_NOWDOC>^{ID};	{
+                                        if (string(yytext, strcspn(yytext, ";")) != buffer->getDocId()) {
+                                            buffer->append(yytext);
                                         }
+                                        else {
+                                            int errorLine = buffer->validateByLastLineAsIndent();
+                                            if (errorLine != -1) {
+                                                Console::LexError("Invalid indent in STRING_NOWDOC/STRING_HEREDOC", buffer->getStartLine() + errorLine);
+                                            }
+                                            Console::LexLog(buffer->getStartLine(), yylineno-1, buffer->current(), "text in STRING_NOWDOC/STRING_HEREDOC");
+                                            Console::LexLog(yylineno, buffer->getDocId() + ";", "end of STRING_NOWDOC/STRING_HEREDOC");
+                                            buffer->reset();
+                                            buffer->setStartLine(yylineno);
+                                            BEGIN(states->popAndPeek());
+                                            BEGIN(states->popAndPeek());
+                                        }
+                                    }
 
+<STRING_NOWDOC,STRING_HEREDOC>[\t ]+    { buffer->append(yytext); }
 <STRING_NOWDOC,STRING_HEREDOC>{ID};	    {
                                             if (string(yytext, strcspn(yytext, ";")) != buffer->getDocId()) {
                                                 buffer->append(yytext);
                                             }
                                             else {
+                                                int errorLine = buffer->validateByLastLineAsIndent();
+                                                if (errorLine != -1) {
+                                                    Console::LexError("Invalid indent in STRING_NOWDOC/STRING_HEREDOC", buffer->getStartLine() + errorLine);
+                                                }
                                                 Console::LexLog(buffer->getStartLine(), yylineno-1, buffer->current(), "text in STRING_NOWDOC/STRING_HEREDOC");
                                                 Console::LexLog(yylineno, buffer->getDocId() + ";", "end of STRING_NOWDOC/STRING_HEREDOC");
                                                 buffer->reset();
@@ -203,13 +215,11 @@ VAR         [Vv][Aa][Rr]
 
 <STRING_NOWDOC>[^\n]+                   { buffer->append(yytext); }
 
-<STRING_NOWDOC,STRING_HEREDOC>\n+		{ buffer->append(yytext); BEGIN(states->pushAndPeek(INDENT_CHECK_HEREDOC_OR_NOWDOC)); }
+<STRING_NOWDOC,STRING_HEREDOC>\n+		{ buffer->appendNewLines(yytext); BEGIN(states->pushAndPeek(INDENT_HEREDOC_OR_NOWDOC)); }
 
 <PURE_PHP,ECHO_PHP,ARRAY_CONTENT>"\""	{ BEGIN(states->pushAndPeek(STRING_DOUBLE_QUOTES)); buffer->reset(); buffer->setStartLine(yylineno); }
 
 <STRING_DOUBLE_QUOTES>[^\\\"\$\{]+	{ buffer->append(yytext); }
-
-<STRING_HEREDOC>[^\\\$\{]				{ buffer->append(yytext); }
 
 <STRING_DOUBLE_QUOTES,STRING_HEREDOC>\\\$	    { buffer->append("$"); }
 <STRING_DOUBLE_QUOTES,STRING_HEREDOC>\\\{	    { buffer->append("{"); }
@@ -264,7 +274,7 @@ VAR         [Vv][Aa][Rr]
 <STRING_DOUBLE_QUOTES>\"			 						{ Console::LexLog(yylineno, buffer->current(), "string inside STRING_DOUBLE_QUOTES"); buffer->reset(); BEGIN(states->popAndPeek()); }
 
 <STRING_DOUBLE_QUOTES,STRING_HEREDOC>\\	    { buffer->append("\\"); }
-<STRING_HEREDOC>[^\\\"\$\{\n]+ 				{ buffer->append(yytext); }
+<STRING_HEREDOC>[^\\\"\$\{\n\t ]+ 		    { buffer->append(yytext); }
 
 
 <COMMENT_HTML,COMMENT_MULTILINE,STRING_HEREDOC_OR_NOWDOC,STRING_NOWDOC,STRING_HEREDOC,STRING_SINGLE_QUOTES,STRING_DOUBLE_QUOTES,ARRAY_CONTENT><<EOF>> { Console::LexError("end of file", yylineno); BEGIN(INITIAL); }

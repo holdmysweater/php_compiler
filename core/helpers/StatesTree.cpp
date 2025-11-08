@@ -64,8 +64,7 @@ string StatesTree::StateCodeToString(int state) {
         case 9: return "STRING_NOWDOC";
         case 10: return "ARRAY_CONTENT";
         case 11: return "ECHO_PHP";
-        case 12: return "INDENT_SET_HEREDOC_OR_NOWDOC";
-        case 13: return "INDENT_CHECK_HEREDOC_OR_NOWDOC";
+        case 12: return "INDENT_HEREDOC_OR_NOWDOC";
         default: return "UNKNOWN";
     }
 }
