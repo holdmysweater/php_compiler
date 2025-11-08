@@ -75,14 +75,29 @@ VAR         [Vv][Aa][Rr]
 	Console::Header("LEXER");
 
 	Buffer* buffer = new Buffer();
+	Buffer* html = new Buffer();
 	StatesTree* states = new StatesTree();
 
 	BEGIN(states->pushAndPeek(INITIAL));
 %}
 
-\<\?([pP][hH][pP])?		{ Console::LexLog(yylineno, yytext, "opening php tag"); BEGIN(states->pushAndPeek(PURE_PHP)); }
-<PURE_PHP>\?\>			{ Console::LexLog(yylineno, yytext, "closing php tag"); BEGIN(states->pushAndPeek(INITIAL)); }
-<PURE_PHP><<EOF>>		{ Console::LexLog(yylineno, yytext, "end of file - closing php tag"); BEGIN(states->pushAndPeek(INITIAL)); }
+\<\?([pP][hH][pP])?		{ 
+                            Console::LexLog(html->getStartLine(), yylineno, html->current(), "html content");
+                            Console::LexLog(yylineno, yytext, "opening php tag"); 
+                            BEGIN(states->pushAndPeek(PURE_PHP)); 
+                        }
+<PURE_PHP>\?\>			{ 
+                            Console::LexLog(yylineno, yytext, "closing php tag"); 
+                            BEGIN(states->popAndPeek()); 
+                            html->reset(); 
+                            html->setStartLine(yylineno); 
+                        }
+<PURE_PHP><<EOF>>		{ 
+                            Console::LexLog(yylineno, yytext, "end of file - closing php tag"); 
+                            BEGIN(states->popAndPeek()); 
+                            html->reset(); 
+                            html->setStartLine(yylineno); 
+                        }
 
 "<!--"					{ BEGIN(states->pushAndPeek(COMMENT_HTML)); }
 <COMMENT_HTML>[^\-]+	;
@@ -319,7 +334,7 @@ VAR         [Vv][Aa][Rr]
 
 <INITIAL,PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>[ \t\n]+	;
 
-<INITIAL>.*	    ;
+<INITIAL>.*	    { html->append(yytext); }
 
 <*>.			{ Console::LexError("unrecognized symbol '" + Buffer::CutStringEnd(yytext, 0) + "'", yylineno); }
 
