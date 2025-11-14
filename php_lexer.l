@@ -376,6 +376,8 @@ VAR         [Vv][Aa][Rr]
 
 <PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>[ \t\n]+	;
 
+<INTERPOLATED_PHP>.  { Console::LexError("expected closing '}' in INTERPOLATED_PHP, but found: '" + Buffer::CutStringEnd(yytext, 0) + "'", yylineno); }
+
 <INITIAL>[^<]*	{ html->append(yytext); }
 <INITIAL>\<	    { html->append(yytext); }
 
