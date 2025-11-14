@@ -77,7 +77,9 @@ VAR         [Vv][Aa][Rr]
 	Console::Header("LEXER");
 
 	Buffer* buffer = new Buffer();
+	buffer->reset();
 	Buffer* html = new Buffer();
+	html->reset();
 	StatesTree* states = new StatesTree();
 
 	BEGIN(states->pushAndPeek(INITIAL));
@@ -274,7 +276,7 @@ VAR         [Vv][Aa][Rr]
 <STRING_DOUBLE_QUOTES>\"			 						{ Console::LexLog(yylineno, buffer->current(), "string inside STRING_DOUBLE_QUOTES"); buffer->reset(); BEGIN(states->popAndPeek()); }
 
 <STRING_DOUBLE_QUOTES,STRING_HEREDOC>\\	    { buffer->append("\\"); }
-<STRING_HEREDOC>[^\\\"\$\{\n\t ]+ 		    { buffer->append(yytext); }
+<STRING_HEREDOC>[^\\\$\{\n\t ]+ 		    { buffer->append(yytext); }
 
 
 <COMMENT_HTML,COMMENT_MULTILINE,STRING_HEREDOC_OR_NOWDOC,STRING_NOWDOC,STRING_HEREDOC,STRING_SINGLE_QUOTES,STRING_DOUBLE_QUOTES,ARRAY_CONTENT><<EOF>> { Console::LexError("end of file", yylineno); BEGIN(INITIAL); }
@@ -373,6 +375,8 @@ VAR         [Vv][Aa][Rr]
 <PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>{NUMBER_EXPONENT}	{ Console::LexLog(yylineno, atof(yytext), "value NUMBER_EXPONENT"); }
 
 <PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>[ \t\n]+	;
+
+<INTERPOLATED_PHP>.  { Console::LexError("expected closing '}' in INTERPOLATED_PHP, but found: '" + Buffer::CutStringEnd(yytext, 0) + "'", yylineno); }
 
 <INITIAL>[^<]*	{ html->append(yytext); }
 <INITIAL>\<	    { html->append(yytext); }
