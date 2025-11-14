@@ -274,7 +274,7 @@ VAR         [Vv][Aa][Rr]
 <STRING_DOUBLE_QUOTES>\"			 						{ Console::LexLog(yylineno, buffer->current(), "string inside STRING_DOUBLE_QUOTES"); buffer->reset(); BEGIN(states->popAndPeek()); }
 
 <STRING_DOUBLE_QUOTES,STRING_HEREDOC>\\	    { buffer->append("\\"); }
-<STRING_HEREDOC>[^\\\"\$\{\n\t ]+ 		    { buffer->append(yytext); }
+<STRING_HEREDOC>[^\\\$\{\n\t ]+ 		    { buffer->append(yytext); }
 
 
 <COMMENT_HTML,COMMENT_MULTILINE,STRING_HEREDOC_OR_NOWDOC,STRING_NOWDOC,STRING_HEREDOC,STRING_SINGLE_QUOTES,STRING_DOUBLE_QUOTES,ARRAY_CONTENT><<EOF>> { Console::LexError("end of file", yylineno); BEGIN(INITIAL); }
