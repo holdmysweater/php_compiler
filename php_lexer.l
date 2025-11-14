@@ -77,7 +77,9 @@ VAR         [Vv][Aa][Rr]
 	Console::Header("LEXER");
 
 	Buffer* buffer = new Buffer();
+	buffer->reset();
 	Buffer* html = new Buffer();
+	html->reset();
 	StatesTree* states = new StatesTree();
 
 	BEGIN(states->pushAndPeek(INITIAL));
