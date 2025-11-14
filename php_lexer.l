@@ -104,23 +104,23 @@ VAR         [Vv][Aa][Rr]
         Token token = tokens->pop();
 
         switch (token.type) {
-            case Token::TokenType::TOKEN_INT:
+            case Token::Type::TOKEN_INT:
                 yylval.int_const = token.value_int;
                 return INT;
 
-            case Token::TokenType::TOKEN_FLOAT:
-                yylval.float_const = token.value_float;
+            case Token::Type::TOKEN_DOUBLE:
+                yylval.float_const = token.value_double;
                 return FLOAT;
 
-            case Token::TokenType::TOKEN_STRING:
+            case Token::Type::TOKEN_STRING:
                 yylval.str_const = token.value_string;
                 return STRING;
 
-            case Token::TokenType::TOKEN_IDENTIFIER:
+            case Token::Type::TOKEN_IDENTIFIER:
                 yylval.id_const = token.value_string;
                 return ID;
 
-            case Token::TokenType::TOKEN_TYPE:
+            case Token::Type::TOKEN_TYPE:
                 yylval.type_const = token.value_string;
                 return TYPE;
         }

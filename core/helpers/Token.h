@@ -7,26 +7,26 @@ using std::string;
 
 class Token {
 public:
-    enum TokenType {
+    enum Type {
         TOKEN_INT,
-        TOKEN_FLOAT,
+        TOKEN_DOUBLE,
         TOKEN_STRING,
         TOKEN_IDENTIFIER,
         TOKEN_TYPE
     };
 
-    TokenType type;
+    Type type;
     int value_int = 0;
-    float value_float = 0;
+    double value_double = 0;
     string value_string;
 
     explicit Token(int value);
 
-    explicit Token(float value);
+    explicit Token(double value);
 
     explicit Token(string value);
 
-    explicit Token(string value, TokenType type);
+    explicit Token(string value, Type type);
 
     string toString() const;
 };
