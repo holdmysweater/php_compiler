@@ -102,6 +102,28 @@ VAR         [Vv][Aa][Rr]
     
     if (!tokens->isEmpty()) {
         Token token = tokens->pop();
+
+        switch (token.type) {
+            case Token::TokenType::TOKEN_INT:
+                yylval.int_const = token.value_int;
+                return INT;
+
+            case Token::TokenType::TOKEN_FLOAT:
+                yylval.float_const = token.value_float;
+                return FLOAT;
+
+            case Token::TokenType::TOKEN_STRING:
+                yylval.str_const = token.value_string;
+                return STRING;
+
+            case Token::TokenType::TOKEN_IDENTIFIER:
+                yylval.id_const = token.value_string;
+                return ID;
+
+            case Token::TokenType::TOKEN_TYPE:
+                yylval.type_const = token.value_string;
+                return TYPE;
+        }
     }
 %}
 
