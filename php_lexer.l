@@ -69,20 +69,40 @@ VAR         [Vv][Aa][Rr]
 	#include "core/helpers/Console.h"
 	#include "core/helpers/StatesTree.h"
 	#include "core/helpers/Buffer.h"
+	#include "core/helpers/Token.h"
+	#include "core/helpers/TokenQueue.h"
+
+    static Buffer* buffer = nullptr;
+    static Buffer* html = nullptr;
+    static StatesTree* states = nullptr;
+    static TokenQueue* tokens = nullptr;
+    
+    static bool initialized = false;
 %}
 
 %%
 
 %{
-	Console::Header("LEXER");
+    if (!initialized) {
+        Console::Header("LEXER");
 
-	Buffer* buffer = new Buffer();
-	buffer->reset();
-	Buffer* html = new Buffer();
-	html->reset();
-	StatesTree* states = new StatesTree();
+        buffer = new Buffer();
+        buffer->reset();
 
-	BEGIN(states->pushAndPeek(INITIAL));
+        html = new Buffer();
+        html->reset();
+
+        states = new StatesTree();
+        tokens = new TokenQueue();
+
+        BEGIN(states->pushAndPeek(INITIAL));
+
+        initialized = true;
+    }
+    
+    if (!tokens->isEmpty()) {
+        Token token = tokens->pop();
+    }
 %}
 
 \<\?=		            { 
@@ -152,7 +172,7 @@ VAR         [Vv][Aa][Rr]
 										BEGIN(states->popAndPeek());
 									}
 
-<PURE_PHP,ECHO_PHP>"<<<"              				{  BEGIN(states->pushAndPeek(STRING_HEREDOC_OR_NOWDOC)); }
+<PURE_PHP,ECHO_PHP>"<<<"              				{ BEGIN(states->pushAndPeek(STRING_HEREDOC_OR_NOWDOC)); }
 <STRING_HEREDOC_OR_NOWDOC>[ \t]*            		;
 <STRING_HEREDOC_OR_NOWDOC>(\'{ID}\'|{ID})[^\n]      { Console::LexError("Invalid \"<<<\" identifier in STRING_HEREDOC_OR_NOWDOC", yylineno); BEGIN(states->popAndPeek()); }
 
@@ -241,7 +261,6 @@ VAR         [Vv][Aa][Rr]
                                                     buffer->setStartLine(yylineno);
                                                     Console::LexLog(yylineno, "[", "operator [");
                                                     BEGIN(states->pushAndPeek(ARRAY_CONTENT));
-
                                                 }
 <STRING_DOUBLE_QUOTES,STRING_HEREDOC>\$			{ buffer->append("$"); }
 <STRING_DOUBLE_QUOTES,STRING_HEREDOC>\{\$ 		{

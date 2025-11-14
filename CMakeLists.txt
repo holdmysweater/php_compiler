@@ -19,6 +19,8 @@ add_custom_command(
 )
 
 set(CORE_SOURCES
+        core/helpers/Token.cpp
+        core/helpers/TokenQueue.cpp
         core/helpers/Console.cpp
         core/helpers/Color.cpp
         core/helpers/Buffer.cpp
