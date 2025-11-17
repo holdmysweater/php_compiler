@@ -9,11 +9,15 @@ using std::string;
 
 class Console {
 public:
-    static void Header(string title);
+    static void SystemTitle(string title);
 
     static void Log(string message);
 
     static void Error(string message);
+
+    static void SystemLog(string message);
+
+    static void SystemError(string message);
 
     static void LexLog(int line, string content, string info);
 
@@ -26,6 +30,10 @@ public:
     static void LexLog(int lineStart, int lineEnd, string content, string info);
 
     static void LexError(string message, int line);
+
+    static void ParserError();
+
+    static void ParserError(string message);
 };
 
 #endif //PHP_COMPILER_CONSOLE_H

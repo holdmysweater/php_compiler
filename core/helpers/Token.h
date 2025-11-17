@@ -12,7 +12,9 @@ public:
         TOKEN_DOUBLE,
         TOKEN_STRING,
         TOKEN_IDENTIFIER,
-        TOKEN_TYPE
+        TOKEN_TYPE,
+        TOKEN_HTML,
+        TOKEN
     };
 
     Type type;
@@ -22,11 +24,13 @@ public:
 
     explicit Token(int value);
 
+    explicit Token(int value, Type type);
+
     explicit Token(double value);
 
     explicit Token(string value);
 
-    explicit Token(string value, Type type);
+    explicit Token(Type type, string value);
 
     string toString() const;
 };

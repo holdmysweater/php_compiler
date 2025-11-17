@@ -1,7 +1,7 @@
 #ifndef PHP_COMPILER_BUFFER_H
 #define PHP_COMPILER_BUFFER_H
 
-#define CONSOLE_BUFFER_LOG_ENABLED
+// #define CONSOLE_BUFFER_LOG_ENABLED
 
 #include "IndentTracker.h"
 
@@ -19,6 +19,10 @@ class Buffer {
 
 public:
     static string CutStringEnd(string str, int count);
+
+    static string getLeftPropertyAccess(string str);
+
+    static string getRightPropertyAccess(string str);
 
     void setStartLine(int line);
 

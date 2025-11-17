@@ -8,6 +8,17 @@ string Buffer::CutStringEnd(string str, int count) {
     return str.substr(0, str.size() - count);
 }
 
+string Buffer::getLeftPropertyAccess(string str) {
+    size_t start = str.find('$') + 1;
+    size_t end = str.find("->");
+    return str.substr(start, end - start);
+}
+
+string Buffer::getRightPropertyAccess(string str) {
+    size_t pos = str.find("->");
+    return str.substr(pos + 2);
+}
+
 void Buffer::setStartLine(int line) {
     _startLine = line;
 }

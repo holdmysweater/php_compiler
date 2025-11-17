@@ -1,12 +1,11 @@
 #include "Console.h"
 #include "Color.h"
 
-void Console::Header(string title) {
+void Console::SystemTitle(string title) {
 #ifdef CONSOLE_LOG_ENABLED
 	Log(Color::Bold() + Color::Blue() + "=============================");
 	Log(Color::Bold() + Color::Blue() + title);
-	Log(Color::Bold() + Color::Blue() + "\n% CONSOLE_LOG_ENABLED");
-	Log(Color::Bold() + Color::Blue() + "=============================");
+	Log(Color::Bold() + Color::Blue() + "=============================\n");
 #endif
 }
 
@@ -18,7 +17,19 @@ void Console::Log(string message) {
 
 void Console::Error(string message) {
 #ifdef CONSOLE_LOG_ENABLED
-	cout << Color::Bold() << Color::Red() << "ERROR: " << message << "\n" << Color::Reset();
+	cout << Color::Bold() << Color::Red() << "Received error: " << message << "\n" << Color::Reset();
+#endif
+}
+
+void Console::SystemLog(string message) {
+#ifdef CONSOLE_LOG_ENABLED
+	Log(Color::Bold() + Color::Blue() + "\n%SYSTEM% " + message + "\n");
+#endif
+}
+
+void Console::SystemError(string message) {
+#ifdef CONSOLE_LOG_ENABLED
+	cout << Color::Bold() << Color::Red() << "\n%SYSTEM% " << message << "\n\n" << Color::Reset();
 #endif
 }
 
@@ -58,6 +69,19 @@ void Console::LexLog(int lineStart, int lineEnd, string content, string info) {
 
 void Console::LexError(string message, int line) {
 #ifdef CONSOLE_LOG_ENABLED
-	cout << Color::Bold() << Color::Red() << "ERROR in line " << line << ": " << message << "\n" << Color::Reset();
+	cout << Color::Bold() << Color::Red() << "%LEXER% ERROR in line " << line << ": " << message << "\n" <<
+			Color::Reset();
+#endif
+}
+
+void Console::ParserError() {
+#ifdef CONSOLE_LOG_ENABLED
+	cout << Color::Bold() << Color::Red() << "%PARSER% In error state\n" << Color::Reset();
+#endif
+}
+
+void Console::ParserError(string message) {
+#ifdef CONSOLE_LOG_ENABLED
+	cout << Color::Bold() << Color::Red() << "%PARSER% ERROR: " << message << "\n" << Color::Reset();
 #endif
 }
