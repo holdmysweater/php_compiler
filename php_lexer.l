@@ -154,6 +154,12 @@ VAR         [Vv][Aa][Rr]
                             Console::LexLog(yylineno, yytext, "opening echo php tag");
                             BEGIN(states->pushAndPeek(ECHO_PHP));
 
+                            if (!html->current().empty()) {
+                                tokens->push(Token(START_ECHO_TAG, Token::Type::TOKEN));
+                                yylval.string_const = new std::string(html->current());
+                                return HTML_CONTENT;
+                            }
+
                             return START_ECHO_TAG;
                         }
 
@@ -164,6 +170,12 @@ VAR         [Vv][Aa][Rr]
 
                             Console::LexLog(yylineno, yytext, "opening php tag");
                             BEGIN(states->pushAndPeek(PURE_PHP));
+
+                            if (!html->current().empty()) {
+                                tokens->push(Token(START_TAG, Token::Type::TOKEN));
+                                yylval.string_const = new std::string(html->current());
+                                return HTML_CONTENT;
+                            }
 
                             return START_TAG;
                         }
