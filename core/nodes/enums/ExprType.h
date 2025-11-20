@@ -59,6 +59,7 @@ enum class ExprType {
     ET_ARRAY_ELEMENT_LIST,
     ET_ARRAY_INDEX,
     ET_ARRAY_APPEND,
+    ET_ARRAY_EMPTY,
     ET_ARRAY_KEY_ACCESS,
     ET_PARENTHESIZED,
     ET_FUNCTION_CALL,
@@ -127,6 +128,7 @@ inline string toString(ExprType type) {
         case ExprType::ET_ARRAY_ELEMENT_LIST: return "ET_ARRAY_ELEMENT_LIST";
         case ExprType::ET_ARRAY_INDEX: return "ET_ARRAY_INDEX";
         case ExprType::ET_ARRAY_APPEND: return "ET_ARRAY_APPEND";
+        case ExprType::ET_ARRAY_EMPTY: return "ET_ARRAY_EMPTY";
         case ExprType::ET_ARRAY_KEY_ACCESS: return "ET_ARRAY_KEY_ACCESS";
         case ExprType::ET_PARENTHESIZED: return "ET_PARENTHESIZED";
         case ExprType::ET_FUNCTION_CALL: return "ET_FUNCTION_CALL";
@@ -197,6 +199,7 @@ inline string toSymbol(ExprType type) {
         case ExprType::ET_ARRAY_ELEMENT_LIST: return "[list]";
         case ExprType::ET_ARRAY_INDEX: return "index[]";
         case ExprType::ET_ARRAY_APPEND: return "[]=";
+        case ExprType::ET_ARRAY_EMPTY: return "empty []";
         case ExprType::ET_ARRAY_KEY_ACCESS: return "[ => ]";
         case ExprType::ET_PARENTHESIZED: return "()";
         case ExprType::ET_FUNCTION_CALL: return "function call";

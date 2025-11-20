@@ -113,6 +113,8 @@ public:
 
     static ExprNode *ArrayAppend(ExprNode *array);
 
+    static ExprNode *Array();
+
     // Ternary operator (condition, trueExpr, falseExpr)
     static ExprNode *Ternary(ExprNode *condition, ExprNode *trueExpr, ExprNode *falseExpr);
 

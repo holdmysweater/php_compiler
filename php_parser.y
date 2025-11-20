@@ -191,6 +191,7 @@ expression : expression LOGIC_OR expression                 { Console::ParserLog
           | '$' expression                                  { Console::ParserLog("expression ('$' expression)"); $$ = ExprNode::Sigil($2); }
           | '[' array_element_list ']'                      { Console::ParserLog("expression ('[' array_element_list ']')"); $$ = ExprNode::ArrayElementList($2); }
           | expression '[' expression ']'                   { Console::ParserLog("expression (expression '[' expression ']')"); $$ = ExprNode::ArrayIndex($1, $3); }
+          | '[' ']'                                         { Console::ParserLog("expression ('[' ']')"); $$ = ExprNode::Array(); }
           | expression '[' ']'                              { Console::ParserLog("expression (expression '[' ']')"); $$ = ExprNode::ArrayAppend($1); }
           | '(' expression_list_empty ')'                   { Console::ParserLog("expression ('(' expression ')')"); $$ = ExprNode::Parenthesized($2); }
           | expression '(' expression_list_empty ')'        { Console::ParserLog("expression (expression '(' expression_list_empty ')')"); $$ = ExprNode::FunctionCall($1, $3); }

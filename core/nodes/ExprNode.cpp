@@ -450,6 +450,13 @@ ExprNode *ExprNode::ArrayAppend(ExprNode *array) {
     return node;
 }
 
+ExprNode *ExprNode::Array() {
+    auto node = new ExprNode();
+    node->type = ExprType::ET_ARRAY_EMPTY;
+    node->WriteToJsonFile();
+    return node;
+}
+
 // Ternary operator
 ExprNode *ExprNode::Ternary(ExprNode *condition, ExprNode *trueExpr, ExprNode *falseExpr) {
     auto node = new ExprNode();
