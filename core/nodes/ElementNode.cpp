@@ -60,27 +60,39 @@ string ElementNode::toDot() const {
         pos += 2;
     }
 
-    result += " node" + std::to_string(GetId()) + " [label=\"" + label +
+    pos = 0;
+    while ((pos = label.find('\n', pos)) != std::string::npos) {
+        label.replace(pos, 1, "\\n");
+        pos += 2;
+    }
+
+    pos = 0;
+    while ((pos = label.find('\r', pos)) != std::string::npos) {
+        label.replace(pos, 1, "\\r");
+        pos += 2;
+    }
+
+    result += "  node" + std::to_string(GetId()) + " [label=\"" + label +
             "\", fillcolor=\"lightgrey\", style=filled];\n";
 
     for (const auto &child: children) {
-        result += " node" + std::to_string(GetId()) + " -> node" + std::to_string(child->GetId()) +
+        result += "  node" + std::to_string(GetId()) + " -> node" + std::to_string(child->GetId()) +
                 " [label=children];\n";
         result += child->toDot();
     }
 
     if (decl != nullptr) {
-        result += " node" + std::to_string(GetId()) + " -> node" + std::to_string(decl->GetId()) + " [label=decl];\n";
+        result += "  node" + std::to_string(GetId()) + " -> node" + std::to_string(decl->GetId()) + " [label=decl];\n";
         result += decl->toDot();
     }
 
     if (stmt != nullptr) {
-        result += " node" + std::to_string(GetId()) + " -> node" + std::to_string(stmt->GetId()) + " [label=stmt];\n";
+        result += "  node" + std::to_string(GetId()) + " -> node" + std::to_string(stmt->GetId()) + " [label=stmt];\n";
         result += stmt->toDot();
     }
 
     if (expr != nullptr) {
-        result += " node" + std::to_string(GetId()) + " -> node" + std::to_string(expr->GetId()) + " [label=expr];\n";
+        result += "  node" + std::to_string(GetId()) + " -> node" + std::to_string(expr->GetId()) + " [label=expr];\n";
         result += expr->toDot();
     }
 

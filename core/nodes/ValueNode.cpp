@@ -93,6 +93,18 @@ string ValueNode::toDot() const {
         pos += 2;
     }
 
+    pos = 0;
+    while ((pos = label.find('\n', pos)) != std::string::npos) {
+        label.replace(pos, 1, "\\n");
+        pos += 2;
+    }
+
+    pos = 0;
+    while ((pos = label.find('\r', pos)) != std::string::npos) {
+        label.replace(pos, 1, "\\r");
+        pos += 2;
+    }
+
     result += "  node" + std::to_string(GetId()) + " [label=\"" + label + "\", fillcolor=\"#FFFFE0\", style=filled];\n";
 
     if (value != nullptr) {
