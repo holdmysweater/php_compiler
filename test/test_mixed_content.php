@@ -34,6 +34,8 @@
     
     <footer>
         <?= $footer ?>
+        <? $footer ?>
+        <?php $footer ?>
     </footer>
 </body>
 </html>
@@ -42,3 +44,5 @@
 // PHP после HTML
 echo "Скрипт завершен";
 ?>
+
+<?= $footer;

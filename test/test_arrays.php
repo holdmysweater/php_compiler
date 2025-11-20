@@ -3,7 +3,7 @@
 $arr = [10, 20, 30];
 
 // Associative array with string keys
-$arr2 = ["name" => "Alice", "age" => 30];
+$arr2 = ["name" => "Alice $name hi", "age" => 30];
 
 // Mixed keys
 $arr3 = [0 => "zero", "1" => "one", "two" => 2];

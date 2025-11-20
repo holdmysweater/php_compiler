@@ -1,4 +1,7 @@
 <?php
 // Basic variable declarations
 $name = 'John Doe
-dsfsdf'
+dsfsdf';
+
+    ?>
+<?= 3 ?>
