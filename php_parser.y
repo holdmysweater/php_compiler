@@ -414,7 +414,9 @@ complex_interpolated_expression : complex_interpolated_expression PROPERTY_ACCES
                   | complex_interpolated_expression STATIC_PROPERTY_ACCESS complex_interpolated_expression          { Console::ParserLog("complex_interpolated_expression (complex_interpolated_expression STATIC_PROPERTY_ACCESS complex_interpolated_expression)"); $$ = ExprNode::StaticPropertyAccess($1, $3); }
                   | complex_interpolated_expression '[' expression ']'                  { Console::ParserLog("complex_interpolated_expression (complex_interpolated_expression '[' expression ']')"); $$ = ExprNode::ArrayIndex($1, $3); }
                   | complex_interpolated_expression '(' expression_list_empty ')'       { Console::ParserLog("complex_interpolated_expression (complex_interpolated_expression '(' expression_list_empty ')')"); $$ = ExprNode::FunctionCall($1, $3); }
-                  | '$' ID                                                              { Console::ParserLog("complex_interpolated_expression ('$' ID)"); $$ = ExprNode::Sigil(ExprNode::Id($2)); }
+                  | '(' expression_list_empty ')'                                       { Console::ParserLog("complex_interpolated_expression ('(' expression_list_empty ')')"); $$ = ExprNode::Parenthesized($2); }
+                  | '$' expression                                                      { Console::ParserLog("complex_interpolated_expression ('$' expression)"); $$ = ExprNode::Sigil($2); }
+                  | ID                                                                  { Console::ParserLog("complex_interpolated_expression (ID)"); $$ = ExprNode::Id($1); }
                   ;
 
 %%

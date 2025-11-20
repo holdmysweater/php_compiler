@@ -300,6 +300,8 @@ VAR         [Vv][Aa][Rr]
                                                 tokens->push(Token(INTERPOLATABLE_END, Token::Type::TOKEN));
                                             }
 
+                                            tokens->push(Token(';'));
+
                                             BEGIN(states->popAndPeek());
 
                                             return STRING;
@@ -329,6 +331,8 @@ VAR         [Vv][Aa][Rr]
                                                 if (states->current() == STRING_HEREDOC) {
                                                     tokens->push(Token(INTERPOLATABLE_END, Token::Type::TOKEN));
                                                 }
+
+                                                tokens->push(Token(';'));
 
                                                 BEGIN(states->popAndPeek());
 

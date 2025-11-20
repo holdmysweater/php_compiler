@@ -35,7 +35,7 @@ $multiline = <<<MD
 
 - Item 1: $value1
 - Item 2: {$value2 + $value3}
-- Item 3: {$object->method()}
+- Item 3: {$something->method()}
 
 `Code: {$code}`
 MD;
