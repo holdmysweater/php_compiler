@@ -1,13 +1,13 @@
 <?php
 
 $integer = 42;
-$float = 3.14;
+$floats = 3.14;
 $float_exp = 2.5e10;
 $hex = 0x1F;
 $octal = 0777;
 $binary = 0b1010;
-$string = "Hello";
-$char = 'A';
+$strings = "Hello";
+$chars = 'A';
 $bool_true = true;
 $bool_false = false;
 $null_value = null;
@@ -28,9 +28,9 @@ $greater = $a > $b;
 $less_eq = $a <= $b;
 $greater_eq = $a >= $b;
 
-$and = $a && $b;
-$or = $a || $b;
-$not = !$a;
+$ands = $a && $b;
+$ors = $a || $b;
+$nots = !$a;
 $and_word = $a and $b;
 $or_word = $a or $b;
 $xor_word = $a xor $b;
