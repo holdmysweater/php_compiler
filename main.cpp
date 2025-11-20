@@ -93,8 +93,8 @@ int main(int argc, char *argv[]) {
     Console::SystemLog("Generating output files...");
 
     try {
-        OutputManager::OutputJson(root->toJson(), baseName);
-        OutputManager::OutputDot(root->toDot(), baseName);
+        OutputManager::OutputJson(root->toJson(), baseName, true);
+        OutputManager::OutputDot(root->toDot(), baseName, true);
     } catch (const std::exception &e) {
         Console::SystemError("Failed to generate output files: " + std::string(e.what()));
         return 1;

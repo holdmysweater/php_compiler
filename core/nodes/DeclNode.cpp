@@ -129,11 +129,13 @@ DeclNode *DeclNode::DeclList(DeclNode *decl) {
     auto node = new DeclNode();
     node->type = DT_LIST;
     node->children.push_back(decl);
+    node->WriteToJsonFile();
     return node;
 }
 
 DeclNode *DeclNode::AppendToDeclList(DeclNode *declList, DeclNode *newDecl) {
     declList->children.push_back(newDecl);
+    declList->WriteToJsonFile();
     return declList;
 }
 
@@ -147,6 +149,7 @@ DeclNode *DeclNode::SetModsToDecl(DeclNode *decl, RawDeclModifier *modifier) {
         decl->visibilityType = modifier->visibility;
         decl->isStatic = modifier->isStatic;
     }
+    decl->WriteToJsonFile();
     return decl;
 }
 
@@ -155,6 +158,7 @@ DeclNode *DeclNode::ClassDecl(string *className, DeclNode *declList) {
     node->type = DT_CLASS;
     node->name = *className;
     node->declList = declList;
+    node->WriteToJsonFile();
     return node;
 }
 
@@ -164,6 +168,7 @@ DeclNode *DeclNode::ClassDecl(string *className, string *extendedClassName, Decl
     node->name = *className;
     node->classNameExtended = *extendedClassName;
     node->declList = declList;
+    node->WriteToJsonFile();
     return node;
 }
 
@@ -171,6 +176,7 @@ DeclNode *DeclNode::PropertyDecl(string *name) {
     auto node = new DeclNode();
     node->type = DT_PROPERTY;
     node->name = *name;
+    node->WriteToJsonFile();
     return node;
 }
 
@@ -179,6 +185,7 @@ DeclNode *DeclNode::PropertyDecl(string *name, ExprNode *expr) {
     node->type = DT_PROPERTY;
     node->name = *name;
     node->expr = expr;
+    node->WriteToJsonFile();
     return node;
 }
 
@@ -187,6 +194,7 @@ DeclNode *DeclNode::ConstDecl(string *name, ExprNode *expr) {
     node->type = DT_CONSTANT;
     node->name = *name;
     node->expr = expr;
+    node->WriteToJsonFile();
     return node;
 }
 
@@ -194,6 +202,7 @@ DeclNode *DeclNode::ParamDecl(string *name) {
     auto node = new DeclNode();
     node->type = DT_PARAMETER;
     node->name = *name;
+    node->WriteToJsonFile();
     return node;
 }
 
@@ -202,6 +211,7 @@ DeclNode *DeclNode::ParamDeclType(string *name, ValueNode *type) {
     node->type = DT_PARAMETER;
     node->name = *name;
     node->valueType = type;
+    node->WriteToJsonFile();
     return node;
 }
 
@@ -210,6 +220,7 @@ DeclNode *DeclNode::ParamDeclExpr(string *name, ExprNode *expr) {
     node->type = DT_PARAMETER;
     node->name = *name;
     node->expr = expr;
+    node->WriteToJsonFile();
     return node;
 }
 
@@ -219,6 +230,7 @@ DeclNode *DeclNode::ParamDeclExprType(string *name, ExprNode *expr, ValueNode *t
     node->name = *name;
     node->expr = expr;
     node->valueType = type;
+    node->WriteToJsonFile();
     return node;
 }
 
@@ -227,6 +239,7 @@ DeclNode *DeclNode::FunctionDecl(string *name, DeclNode *params) {
     node->type = DT_FUNCTION;
     node->name = *name;
     node->declList = params;
+    node->WriteToJsonFile();
     return node;
 }
 
@@ -236,10 +249,12 @@ DeclNode *DeclNode::FunctionDecl(string *name, DeclNode *params, ValueNode *type
     node->name = *name;
     node->declList = params;
     node->valueType = type;
+    node->WriteToJsonFile();
     return node;
 }
 
 DeclNode *DeclNode::FunctionAddBody(DeclNode *func, StmtNode *body) {
     func->stmt = body;
+    func->WriteToJsonFile();
     return func;
 }

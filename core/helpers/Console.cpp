@@ -74,6 +74,10 @@ void Console::LexError(string message, int line) {
 #endif
 }
 
+void Console::ParserLog(string message) {
+	Console::Log(Color::Grey() + "%PARSER% State: '" + message + "'");
+}
+
 void Console::ParserError() {
 #ifdef CONSOLE_LOG_ENABLED
 	cout << Color::Bold() << Color::Red() << "%PARSER% In error state\n" << Color::Reset();

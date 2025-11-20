@@ -10,7 +10,11 @@ class OutputManager {
 public:
     static void OutputJson(const std::string &jsonContent, const std::string &baseName);
 
+    static void OutputJson(const std::string &jsonContent, const std::string &baseName, bool isLogEnabled);
+
     static void OutputDot(const std::string &dotContent, const std::string &baseName);
+
+    static void OutputDot(const std::string &dotContent, const std::string &baseName, bool isLogEnabled);
 
 private:
     static fs::path EnsureOutputDir();
@@ -18,6 +22,8 @@ private:
     static fs::path EnsureDotOutputDir();
 
     static void GenerateSvgFromDot(const fs::path &dotFilePath);
+
+    static void GenerateSvgFromDot(const fs::path &dotFilePath, bool isLogEnabled);
 };
 
 #endif //PHP_COMPILER_OUTPUTMANAGER_H

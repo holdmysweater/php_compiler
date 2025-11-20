@@ -19,7 +19,9 @@ protected:
 public:
     virtual ~BaseNode() = default;
 
-    uint32_t GetId() const { return id; }
+    uint32_t GetId() const;
+
+    void WriteToJsonFile() const;
 
     virtual string toJson() const = 0;
 

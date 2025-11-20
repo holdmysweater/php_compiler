@@ -17,19 +17,29 @@ fs::path OutputManager::EnsureDotOutputDir() {
 }
 
 void OutputManager::GenerateSvgFromDot(const fs::path &dotFilePath) {
+    GenerateSvgFromDot(dotFilePath, false);
+}
+
+void OutputManager::GenerateSvgFromDot(const fs::path &dotFilePath, bool isLogEnabled) {
     fs::path svgFile = fs::path(dotFilePath.string() + ".svg");
     std::string svgCommand = "dot -Tsvg \"" + dotFilePath.string() + "\" -o \"" + svgFile.string() + "\"";
 
     int result = system(svgCommand.c_str());
 
     if (result == 0) {
-        Console::SystemLog("SVG generated: '" + svgFile.string() + "'");
+        if (isLogEnabled) {
+            Console::SystemLog("SVG generated: '" + svgFile.string() + "'");
+        }
     } else {
         Console::SystemError("Failed to generate SVG (make sure Graphviz is installed and in PATH)");
     }
 }
 
 void OutputManager::OutputJson(const std::string &jsonContent, const std::string &baseName) {
+    OutputJson(jsonContent, baseName, false);
+}
+
+void OutputManager::OutputJson(const std::string &jsonContent, const std::string &baseName, bool isLogEnabled) {
     fs::path outputDir = EnsureOutputDir();
     fs::path jsonPath = outputDir / (baseName + "_ast.json");
 
@@ -37,13 +47,20 @@ void OutputManager::OutputJson(const std::string &jsonContent, const std::string
     if (jsonFile.is_open()) {
         jsonFile << jsonContent;
         jsonFile.close();
-        Console::SystemLog("JSON AST written to: '" + jsonPath.string() + "'");
+
+        if (isLogEnabled) {
+            Console::SystemLog("JSON AST written to: '" + jsonPath.string() + "'");
+        }
     } else {
         Console::SystemError("Could not write JSON file to '" + jsonPath.string() + "'");
     }
 }
 
 void OutputManager::OutputDot(const std::string &dotContent, const std::string &baseName) {
+    OutputDot(dotContent, baseName, false);
+}
+
+void OutputManager::OutputDot(const std::string &dotContent, const std::string &baseName, bool isLogEnabled) {
     fs::path dotDir = EnsureDotOutputDir();
     fs::path dotPath = dotDir / (baseName + "_tree.dot");
 
@@ -75,9 +92,12 @@ void OutputManager::OutputDot(const std::string &dotContent, const std::string &
         dotFile << "}\n";
 
         dotFile.close();
-        Console::SystemLog("DOT visualization written to: '" + dotPath.string() + "'");
 
-        GenerateSvgFromDot(dotPath);
+        if (isLogEnabled) {
+            Console::SystemLog("DOT visualization written to: '" + dotPath.string() + "'");
+        }
+
+        GenerateSvgFromDot(dotPath, isLogEnabled);
     } else {
         Console::SystemError("Could not write DOT file to '" + dotPath.string() + "'");
     }

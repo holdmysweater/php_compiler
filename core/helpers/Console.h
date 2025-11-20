@@ -31,6 +31,8 @@ public:
 
     static void LexError(string message, int line);
 
+    static void ParserLog(string message);
+
     static void ParserError();
 
     static void ParserError(string message);

@@ -112,11 +112,13 @@ ValueNode *ValueNode::ValueList(ValueNode *value) {
     auto list = new ValueNode();
     list->type = ValueType::TYPE_ARRAY;
     list->valueList.push_back(value);
+    list->WriteToJsonFile();
     return list;
 }
 
 ValueNode *ValueNode::AppendToValueList(ValueNode *valueList, ValueNode *newValue) {
     valueList->valueList.push_back(newValue);
+    valueList->WriteToJsonFile();
     return valueList;
 }
 
@@ -124,6 +126,7 @@ ValueNode *ValueNode::CreateInt(int val) {
     auto v = new ValueNode();
     v->type = ValueType::TYPE_INT;
     v->intValue = val;
+    v->WriteToJsonFile();
     return v;
 }
 
@@ -131,6 +134,7 @@ ValueNode *ValueNode::CreateFloat(float val) {
     auto v = new ValueNode();
     v->type = ValueType::TYPE_FLOAT;
     v->floatValue = val;
+    v->WriteToJsonFile();
     return v;
 }
 
@@ -138,6 +142,7 @@ ValueNode *ValueNode::CreateBool(bool val) {
     auto v = new ValueNode();
     v->type = ValueType::TYPE_BOOL;
     v->boolValue = val;
+    v->WriteToJsonFile();
     return v;
 }
 
@@ -145,6 +150,7 @@ ValueNode *ValueNode::CreateString(string *val) {
     auto v = new ValueNode();
     v->type = ValueType::TYPE_STRING;
     v->stringValue = *val;
+    v->WriteToJsonFile();
     return v;
 }
 
@@ -152,6 +158,7 @@ ValueNode *ValueNode::CreateIdentifier(string *name) {
     auto v = new ValueNode();
     v->type = ValueType::TYPE_IDENTIFIER;
     v->name = *name;
+    v->WriteToJsonFile();
     return v;
 }
 
@@ -159,6 +166,7 @@ ValueNode *ValueNode::CreateClass(string *name) {
     auto v = new ValueNode();
     v->type = ValueType::TYPE_CLASS;
     v->name = *name;
+    v->WriteToJsonFile();
     return v;
 }
 
@@ -166,6 +174,7 @@ ValueNode *ValueNode::CreateFunction(string *name) {
     auto v = new ValueNode();
     v->type = ValueType::TYPE_FUNCTION;
     v->name = *name;
+    v->WriteToJsonFile();
     return v;
 }
 
@@ -173,6 +182,7 @@ ValueNode *ValueNode::CreateType(string *name) {
     auto v = new ValueNode();
     v->type = ValueType::TYPE_TYPE;
     v->name = *name;
+    v->WriteToJsonFile();
     return v;
 }
 
@@ -180,5 +190,6 @@ ValueNode *ValueNode::CreateTypeNull() {
     auto v = new ValueNode();
     v->type = ValueType::TYPE_TYPE;
     v->name = "null";
+    v->WriteToJsonFile();
     return v;
 }
