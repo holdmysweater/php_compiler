@@ -11,8 +11,7 @@ $переменная = "cyrillic";
 $_123 = "number at start";
 
 $complex1 = "Result: {($a + $b) * $c}";
-$complex2 = "Ternary: {$isValid ? 'Yes' : 'No'}";
-$complex3 = "Call: {strtoupper($name)}";
+$complex2 = "Call: {strtoupper($name)}";
 
 $large_int = 1234567890;
 $small_float = 0.0000001;
