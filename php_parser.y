@@ -106,7 +106,7 @@
 %precedence UMINUS UPLUS
 %nonassoc INSTANCEOF
 %nonassoc INCREMENT DECREMENT
-%nonassoc '[' PROPERTY_ACCESS STATIC_PROPERTY_ACCESS
+%left '[' PROPERTY_ACCESS STATIC_PROPERTY_ACCESS
 %precedence '$'
 %precedence '('
 %precedence NEW
@@ -192,7 +192,7 @@ expression : expression LOGIC_OR expression                 { Console::ParserLog
           | '[' array_element_list ']'                      { Console::ParserLog("expression ('[' array_element_list ']')"); $$ = ExprNode::ArrayElementList($2); }
           | expression '[' expression ']'                   { Console::ParserLog("expression (expression '[' expression ']')"); $$ = ExprNode::ArrayIndex($1, $3); }
           | expression '[' ']'                              { Console::ParserLog("expression (expression '[' ']')"); $$ = ExprNode::ArrayAppend($1); }
-          | '(' expression ')'                              { Console::ParserLog("expression ('(' expression ')')"); $$ = ExprNode::Parenthesized($2); }
+          | '(' expression_list_empty ')'                   { Console::ParserLog("expression ('(' expression ')')"); $$ = ExprNode::Parenthesized($2); }
           | expression '(' expression_list_empty ')'        { Console::ParserLog("expression (expression '(' expression_list_empty ')')"); $$ = ExprNode::FunctionCall($1, $3); }
           | NEW expression  { Console::ParserLog("expression (NEW expression)"); $$ = ExprNode::New($2); }
           | string          { Console::ParserLog("expression (string)"); $$ = $1; }

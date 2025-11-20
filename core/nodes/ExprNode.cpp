@@ -556,7 +556,9 @@ ExprNode *ExprNode::FunctionCall(ExprNode *function, ExprNode *arguments) {
     auto node = new ExprNode();
     node->type = ExprType::ET_FUNCTION_CALL;
     node->children.push_back(function);
-    node->children.push_back(arguments);
+    if (arguments != nullptr) {
+        node->children.push_back(arguments);
+    }
     node->WriteToJsonFile();
     return node;
 }

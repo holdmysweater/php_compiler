@@ -28,7 +28,7 @@ $user->age = 25;
 $user_name = $user->name;
 $user_age = $user->age;
 
-$result = $object->method1()->method2()->property;
+$result = $something->method1()->method2()->property;
 
 $users = [
     $user,
@@ -38,8 +38,8 @@ $users = [
 $arr[0] = "zero";
 $arr["one"] = 1;
 $arr['two'] = 2;
-$arr[true] = "bool";   
-$arr[null] = "null";   
-$arr[1.5] = "float";   
+$arr[true] = "bool";
+$arr[null] = "null";
+$arr[1.5] = "float";
 
 ?>
