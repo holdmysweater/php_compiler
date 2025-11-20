@@ -30,7 +30,7 @@ class Test {
 /* Nested /* comment */ // doesn't work in PHP */
 
 // Comment after code
-$var = "value"; // inline comment
+$vars = "value"; // inline comment
 
 /* Comment
    with * asterisks
