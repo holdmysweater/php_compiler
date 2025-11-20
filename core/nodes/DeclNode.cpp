@@ -99,26 +99,29 @@ string DeclNode::toDot() const {
     result += " node" + std::to_string(GetId()) + " [label=\"" + label + "\", fillcolor=\"#FFD580\", style=filled];\n";
 
     for (const auto &child: children) {
-        result += " node" + std::to_string(GetId()) + " -> node" + std::to_string(child->GetId()) + ";\n";
+        result += " node" + std::to_string(GetId()) + " -> node" + std::to_string(child->GetId()) +
+                " [label=children];\n";
         result += child->toDot();
     }
 
     if (declList != nullptr) {
-        result += " node" + std::to_string(GetId()) + " -> node" + std::to_string(declList->GetId()) + ";\n";
+        result += " node" + std::to_string(GetId()) + " -> node" + std::to_string(declList->GetId()) +
+                " [label=declList];\n";
         result += declList->toDot();
     }
 
     if (expr != nullptr) {
-        result += " node" + std::to_string(GetId()) + " -> node" + std::to_string(expr->GetId()) + ";\n";
+        result += " node" + std::to_string(GetId()) + " -> node" + std::to_string(expr->GetId()) + " [label=expr];\n";
         result += expr->toDot();
     }
     if (stmt != nullptr) {
-        result += " node" + std::to_string(GetId()) + " -> node" + std::to_string(stmt->GetId()) + ";\n";
+        result += " node" + std::to_string(GetId()) + " -> node" + std::to_string(stmt->GetId()) + " [label=stmt];\n";
         result += stmt->toDot();
     }
 
     if (valueType != nullptr) {
-        result += " node" + std::to_string(GetId()) + " -> node" + std::to_string(valueType->GetId()) + ";\n";
+        result += " node" + std::to_string(GetId()) + " -> node" + std::to_string(valueType->GetId()) +
+                " [label=valueType];\n";
         result += valueType->toDot();
     }
 

@@ -64,22 +64,23 @@ string ElementNode::toDot() const {
             "\", fillcolor=\"lightgrey\", style=filled];\n";
 
     for (const auto &child: children) {
-        result += " node" + std::to_string(GetId()) + " -> node" + std::to_string(child->GetId()) + ";\n";
+        result += " node" + std::to_string(GetId()) + " -> node" + std::to_string(child->GetId()) +
+                " [label=children];\n";
         result += child->toDot();
     }
 
     if (decl != nullptr) {
-        result += " node" + std::to_string(GetId()) + " -> node" + std::to_string(decl->GetId()) + ";\n";
+        result += " node" + std::to_string(GetId()) + " -> node" + std::to_string(decl->GetId()) + " [label=decl];\n";
         result += decl->toDot();
     }
 
     if (stmt != nullptr) {
-        result += " node" + std::to_string(GetId()) + " -> node" + std::to_string(stmt->GetId()) + ";\n";
+        result += " node" + std::to_string(GetId()) + " -> node" + std::to_string(stmt->GetId()) + " [label=stmt];\n";
         result += stmt->toDot();
     }
 
     if (expr != nullptr) {
-        result += " node" + std::to_string(GetId()) + " -> node" + std::to_string(expr->GetId()) + ";\n";
+        result += " node" + std::to_string(GetId()) + " -> node" + std::to_string(expr->GetId()) + " [label=expr];\n";
         result += expr->toDot();
     }
 

@@ -96,12 +96,14 @@ string ValueNode::toDot() const {
     result += "  node" + std::to_string(GetId()) + " [label=\"" + label + "\", fillcolor=\"#FFFFE0\", style=filled];\n";
 
     if (value != nullptr) {
-        result += "  node" + std::to_string(GetId()) + " -> node" + std::to_string(value->GetId()) + ";\n";
+        result += "  node" + std::to_string(GetId()) + " -> node" + std::to_string(value->GetId()) +
+                " [label=value];\n";
         result += value->toDot();
     }
 
     for (const auto &elem: valueList) {
-        result += "  node" + std::to_string(GetId()) + " -> node" + std::to_string(elem->GetId()) + ";\n";
+        result += "  node" + std::to_string(GetId()) + " -> node" + std::to_string(elem->GetId()) +
+                " [label=valueList];\n";
         result += elem->toDot();
     }
 

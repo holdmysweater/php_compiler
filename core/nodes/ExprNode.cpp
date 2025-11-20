@@ -47,12 +47,14 @@ string ExprNode::toDot() const {
     result += "  node" + std::to_string(GetId()) + " [label=\"" + label + "\", fillcolor=\"#90EE90\", style=filled];\n";
 
     if (value != nullptr) {
-        result += "  node" + std::to_string(GetId()) + " -> node" + std::to_string(value->GetId()) + ";\n";
+        result += "  node" + std::to_string(GetId()) + " -> node" + std::to_string(value->GetId()) +
+                " [label=value];\n";
         result += value->toDot();
     }
 
     for (const auto &child: children) {
-        result += "  node" + std::to_string(GetId()) + " -> node" + std::to_string(child->GetId()) + ";\n";
+        result += "  node" + std::to_string(GetId()) + " -> node" + std::to_string(child->GetId()) +
+                " [label=children];\n";
         result += child->toDot();
     }
 

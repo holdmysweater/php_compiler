@@ -108,57 +108,66 @@ string StmtNode::toDot() const {
     result += "  node" + std::to_string(GetId()) + " [label=\"" + label + "\", fillcolor=\"#ADD8E6\", style=filled];\n";
 
     if (expr != nullptr) {
-        result += "  node" + std::to_string(GetId()) + " -> node" + std::to_string(expr->GetId()) + ";\n";
+        result += "  node" + std::to_string(GetId()) + " -> node" + std::to_string(expr->GetId()) + " [label=expr];\n";
         result += expr->toDot();
     }
 
     if (condition != nullptr) {
-        result += "  node" + std::to_string(GetId()) + " -> node" + std::to_string(condition->GetId()) + ";\n";
+        result += "  node" + std::to_string(GetId()) + " -> node" + std::to_string(condition->GetId()) +
+                " [label=condition];\n";
         result += condition->toDot();
     }
 
     if (loopInitializer != nullptr) {
-        result += "  node" + std::to_string(GetId()) + " -> node" + std::to_string(loopInitializer->GetId()) + ";\n";
+        result += "  node" + std::to_string(GetId()) + " -> node" + std::to_string(loopInitializer->GetId()) +
+                " [label=loopInitializer];\n";
         result += loopInitializer->toDot();
     }
 
     if (loopEndAction != nullptr) {
-        result += "  node" + std::to_string(GetId()) + " -> node" + std::to_string(loopEndAction->GetId()) + ";\n";
+        result += "  node" + std::to_string(GetId()) + " -> node" + std::to_string(loopEndAction->GetId()) +
+                " [label=loopEndAction];\n";
         result += loopEndAction->toDot();
     }
 
     if (foreachCollection != nullptr) {
-        result += "  node" + std::to_string(GetId()) + " -> node" + std::to_string(foreachCollection->GetId()) + ";\n";
+        result += "  node" + std::to_string(GetId()) + " -> node" + std::to_string(foreachCollection->GetId()) +
+                " [label=foreachCollection];\n";
         result += foreachCollection->toDot();
     }
 
     if (foreachKey != nullptr) {
-        result += "  node" + std::to_string(GetId()) + " -> node" + std::to_string(foreachKey->GetId()) + ";\n";
+        result += "  node" + std::to_string(GetId()) + " -> node" + std::to_string(foreachKey->GetId()) +
+                " [label=foreachKey];\n";
         result += foreachKey->toDot();
     }
 
     if (foreachValue != nullptr) {
-        result += "  node" + std::to_string(GetId()) + " -> node" + std::to_string(foreachValue->GetId()) + ";\n";
+        result += "  node" + std::to_string(GetId()) + " -> node" + std::to_string(foreachValue->GetId()) +
+                " [label=foreachValue];\n";
         result += foreachValue->toDot();
     }
 
     if (elseIfStmt != nullptr) {
-        result += "  node" + std::to_string(GetId()) + " -> node" + std::to_string(elseIfStmt->GetId()) + ";\n";
+        result += "  node" + std::to_string(GetId()) + " -> node" + std::to_string(elseIfStmt->GetId()) +
+                " [label=elseIfStmt];\n";
         result += elseIfStmt->toDot();
     }
 
     if (elseStmt != nullptr) {
-        result += "  node" + std::to_string(GetId()) + " -> node" + std::to_string(elseStmt->GetId()) + ";\n";
+        result += "  node" + std::to_string(GetId()) + " -> node" + std::to_string(elseStmt->GetId()) +
+                " [label=elseStmt];\n";
         result += elseStmt->toDot();
     }
 
     if (stmt != nullptr) {
-        result += "  node" + std::to_string(GetId()) + " -> node" + std::to_string(stmt->GetId()) + ";\n";
+        result += "  node" + std::to_string(GetId()) + " -> node" + std::to_string(stmt->GetId()) + " [label=stmt];\n";
         result += stmt->toDot();
     }
 
     for (const auto &child: children) {
-        result += "  node" + std::to_string(GetId()) + " -> node" + std::to_string(child->GetId()) + ";\n";
+        result += "  node" + std::to_string(GetId()) + " -> node" + std::to_string(child->GetId()) +
+                " [label=children];\n";
         result += child->toDot();
     }
 
