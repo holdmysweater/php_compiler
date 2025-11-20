@@ -482,10 +482,10 @@ VAR         [Vv][Aa][Rr]
                         }
 
 <ARRAY_CONTENT>"]"	    {
-                            Console::LexLog(yylineno, yytext, "operator ] in ARRAY_CONTENT");
+                            Console::LexLog(yylineno, yytext, "operator ']' in ARRAY_CONTENT");
                             BEGIN(states->popAndPeek());
 
-                            if (states->current() == STRING_HEREDOC) {
+                            if (states->current() == STRING_HEREDOC || states->current() == STRING_DOUBLE_QUOTES) {
                                 tokens->push(Token(INTERPOLATION_END, Token::Type::TOKEN));
                             }
 
@@ -538,61 +538,61 @@ VAR         [Vv][Aa][Rr]
 <PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>{ITERABLE}     { Console::LexLog(yylineno, yytext, "keyword ITERABLE"); yylval.string_const = new std::string("iterable"); return TYPE; }
 <PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>{RESOURCE}     { Console::LexLog(yylineno, yytext, "keyword RESOURCE"); yylval.string_const = new std::string("resource"); return TYPE; }
 
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"===" 	{ Console::LexLog(yylineno, yytext, "operator ==="); return IDENTICALLY_EQUAL; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"!==" 	{ Console::LexLog(yylineno, yytext, "operator !=="); return IDENTICALLY_NOT_EQUAL; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"::"  	{ Console::LexLog(yylineno, yytext, "operator ::"); return STATIC_PROPERTY_ACCESS; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"**"  	{ Console::LexLog(yylineno, yytext, "operator **"); return POW; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"<="  	{ Console::LexLog(yylineno, yytext, "operator <="); return LESS_OR_EQUAL; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>">="  	{ Console::LexLog(yylineno, yytext, "operator >="); return GREAT_OR_EQUAL; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"<<"  	{ Console::LexLog(yylineno, yytext, "operator <<"); return LEFT_SHIFT; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>">>"  	{ Console::LexLog(yylineno, yytext, "operator >>"); return RIGHT_SHIFT; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"=="  	{ Console::LexLog(yylineno, yytext, "operator =="); return EQUAL; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"*="  	{ Console::LexLog(yylineno, yytext, "operator *="); return MULT_ASSIGN; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"**="  	{ Console::LexLog(yylineno, yytext, "operator **="); return POW_ASSIGN; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"/="  	{ Console::LexLog(yylineno, yytext, "operator /="); return DIV_ASSIGN; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"+="  	{ Console::LexLog(yylineno, yytext, "operator +="); return PLUS_ASSIGN; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"-="  	{ Console::LexLog(yylineno, yytext, "operator -="); return MINUS_ASSIGN; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>".="  	{ Console::LexLog(yylineno, yytext, "operator .="); return CONCAT_ASSIGN; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"<<="  	{ Console::LexLog(yylineno, yytext, "operator <<="); return LEFT_SHIFT_ASSIGN; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>">>="  	{ Console::LexLog(yylineno, yytext, "operator >>="); return RIGHT_SHIFT_ASSIGN; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"!="  	{ Console::LexLog(yylineno, yytext, "operator !="); return NOT_EQUAL; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"<>"  	{ Console::LexLog(yylineno, yytext, "operator <>"); return NOT_EQUAL_BITWISE; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"&&"  	{ Console::LexLog(yylineno, yytext, "operator &&"); return LOGIC_AND; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"||"  	{ Console::LexLog(yylineno, yytext, "operator ||"); return LOGIC_OR; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"++"      { Console::LexLog(yylineno, yytext, "operator ++"); return INCREMENT; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"--"      { Console::LexLog(yylineno, yytext, "operator --"); return DECREMENT; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"&"   	{ Console::LexLog(yylineno, yytext, "operator &"); return *yytext; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"|"   	{ Console::LexLog(yylineno, yytext, "operator |"); return *yytext; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"^"   	{ Console::LexLog(yylineno, yytext, "operator ^"); return *yytext; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"!"   	{ Console::LexLog(yylineno, yytext, "operator !"); return *yytext; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"~"   	{ Console::LexLog(yylineno, yytext, "operator ~"); return *yytext; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"*"   	{ Console::LexLog(yylineno, yytext, "operator *"); return *yytext; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"/"   	{ Console::LexLog(yylineno, yytext, "operator /"); return *yytext; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"%"   	{ Console::LexLog(yylineno, yytext, "operator %"); return *yytext; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"+"   	{ Console::LexLog(yylineno, yytext, "operator +"); return *yytext; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"."   	{ Console::LexLog(yylineno, yytext, "operator ."); return *yytext; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"-"   	{ Console::LexLog(yylineno, yytext, "operator -"); return *yytext; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"<"   	{ Console::LexLog(yylineno, yytext, "operator <"); return *yytext; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>">"   	{ Console::LexLog(yylineno, yytext, "operator >"); return *yytext; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"="   	{ Console::LexLog(yylineno, yytext, "operator ="); return *yytext; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>";"	    { Console::LexLog(yylineno, yytext, "operator ;"); return *yytext; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>":"	    { Console::LexLog(yylineno, yytext, "operator :"); return *yytext; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"?"	    { Console::LexLog(yylineno, yytext, "operator ?"); return *yytext; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"{"	    { Console::LexLog(yylineno, yytext, "operator {"); return *yytext; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"}"	    { Console::LexLog(yylineno, yytext, "operator }"); return *yytext; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"]"	    { Console::LexLog(yylineno, yytext, "operator ]"); return *yytext; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>","	    { Console::LexLog(yylineno, yytext, "operator ,"); return *yytext; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"$"       { Console::LexLog(yylineno, yytext, "operator $"); return *yytext; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"===" 	{ Console::LexLog(yylineno, yytext, "operator '==='"); return IDENTICALLY_EQUAL; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"!==" 	{ Console::LexLog(yylineno, yytext, "operator '!=='"); return IDENTICALLY_NOT_EQUAL; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"::"  	{ Console::LexLog(yylineno, yytext, "operator '::'"); return STATIC_PROPERTY_ACCESS; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"**"  	{ Console::LexLog(yylineno, yytext, "operator '**'"); return POW; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"<="  	{ Console::LexLog(yylineno, yytext, "operator '<='"); return LESS_OR_EQUAL; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>">="  	{ Console::LexLog(yylineno, yytext, "operator '>='"); return GREAT_OR_EQUAL; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"<<"  	{ Console::LexLog(yylineno, yytext, "operator '<<'"); return LEFT_SHIFT; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>">>"  	{ Console::LexLog(yylineno, yytext, "operator '>>'"); return RIGHT_SHIFT; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"=="  	{ Console::LexLog(yylineno, yytext, "operator '=='"); return EQUAL; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"*="  	{ Console::LexLog(yylineno, yytext, "operator '*='"); return MULT_ASSIGN; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"**="  	{ Console::LexLog(yylineno, yytext, "operator '**='"); return POW_ASSIGN; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"/="  	{ Console::LexLog(yylineno, yytext, "operator '/='"); return DIV_ASSIGN; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"+="  	{ Console::LexLog(yylineno, yytext, "operator '+='"); return PLUS_ASSIGN; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"-="  	{ Console::LexLog(yylineno, yytext, "operator '-='"); return MINUS_ASSIGN; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>".="  	{ Console::LexLog(yylineno, yytext, "operator '.='"); return CONCAT_ASSIGN; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"<<="  	{ Console::LexLog(yylineno, yytext, "operator '<<='"); return LEFT_SHIFT_ASSIGN; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>">>="  	{ Console::LexLog(yylineno, yytext, "operator '>>='"); return RIGHT_SHIFT_ASSIGN; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"!="  	{ Console::LexLog(yylineno, yytext, "operator '!='"); return NOT_EQUAL; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"<>"  	{ Console::LexLog(yylineno, yytext, "operator '<>'"); return NOT_EQUAL_BITWISE; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"&&"  	{ Console::LexLog(yylineno, yytext, "operator '&&'"); return LOGIC_AND; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"||"  	{ Console::LexLog(yylineno, yytext, "operator '||'"); return LOGIC_OR; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"++"      { Console::LexLog(yylineno, yytext, "operator '++'"); return INCREMENT; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"--"      { Console::LexLog(yylineno, yytext, "operator '--'"); return DECREMENT; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"&"   	{ Console::LexLog(yylineno, yytext, "operator '&'"); return *yytext; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"|"   	{ Console::LexLog(yylineno, yytext, "operator '|'"); return *yytext; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"^"   	{ Console::LexLog(yylineno, yytext, "operator '^'"); return *yytext; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"!"   	{ Console::LexLog(yylineno, yytext, "operator '!'"); return *yytext; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"~"   	{ Console::LexLog(yylineno, yytext, "operator '~'"); return *yytext; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"*"   	{ Console::LexLog(yylineno, yytext, "operator '*'"); return *yytext; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"/"   	{ Console::LexLog(yylineno, yytext, "operator '/'"); return *yytext; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"%"   	{ Console::LexLog(yylineno, yytext, "operator '%'"); return *yytext; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"+"   	{ Console::LexLog(yylineno, yytext, "operator '+'"); return *yytext; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"."   	{ Console::LexLog(yylineno, yytext, "operator '.'"); return *yytext; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"-"   	{ Console::LexLog(yylineno, yytext, "operator '-'"); return *yytext; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"<"   	{ Console::LexLog(yylineno, yytext, "operator '<'"); return *yytext; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>">"   	{ Console::LexLog(yylineno, yytext, "operator '>'"); return *yytext; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"="   	{ Console::LexLog(yylineno, yytext, "operator '='"); return *yytext; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>";"	    { Console::LexLog(yylineno, yytext, "operator ';'"); return *yytext; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>":"	    { Console::LexLog(yylineno, yytext, "operator ':'"); return *yytext; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"?"	    { Console::LexLog(yylineno, yytext, "operator '?'"); return *yytext; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"{"	    { Console::LexLog(yylineno, yytext, "operator '{'"); return *yytext; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"}"	    { Console::LexLog(yylineno, yytext, "operator '}'"); return *yytext; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"]"	    { Console::LexLog(yylineno, yytext, "operator ']'"); return *yytext; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>","	    { Console::LexLog(yylineno, yytext, "operator ','"); return *yytext; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"$"       { Console::LexLog(yylineno, yytext, "operator '$'"); return *yytext; }
 
 <PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>{TRUE}	{ Console::LexLog(yylineno, yytext, "value true"); yylval.int_const = 1; return BOOL; }
 <PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>{FALSE}	{ Console::LexLog(yylineno, yytext, "value false"); yylval.int_const = 0; return BOOL; }
 <PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>{NULL}	{ Console::LexLog(yylineno, yytext, "value null"); return NIL; }
 
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"(" 	{ Console::LexLog(yylineno, yytext, "operator ("); return *yytext; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>")" 	{ Console::LexLog(yylineno, yytext, "operator )"); return *yytext; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"->"  { Console::LexLog(yylineno, yytext, "operator ->"); return PROPERTY_ACCESS; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"=>"  { Console::LexLog(yylineno, yytext, "operator =>"); return KEY_ACCESS; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"["	{ Console::LexLog(yylineno, yytext, "operator ["); BEGIN(states->pushAndPeek(ARRAY_CONTENT)); return *yytext; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"(" 	{ Console::LexLog(yylineno, yytext, "operator '('"); return *yytext; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>")" 	{ Console::LexLog(yylineno, yytext, "operator ')'"); return *yytext; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"->"  { Console::LexLog(yylineno, yytext, "operator '->'"); return PROPERTY_ACCESS; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"=>"  { Console::LexLog(yylineno, yytext, "operator '=>'"); return KEY_ACCESS; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"["	{ Console::LexLog(yylineno, yytext, "operator '['"); BEGIN(states->pushAndPeek(ARRAY_CONTENT)); return *yytext; }
 
 <PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>{NUMBER_DECIMAL}		{
                                                                             Console::LexLog(yylineno, (int)strtol(yytext,NULL,10), "value NUMBER_DECIMAL");
