@@ -21,8 +21,6 @@ INT         [Ii][Nn][Tt]
 FLOAT       [Ff][Ll][Oo][Aa][Tt]
 STRING      [Ss][Tt][Rr][Ii][Nn][Gg]
 BOOL        [Bb][Oo][Oo][Ll]
-ARRAY       [Aa][Rr][Rr][Aa][Yy]
-OBJECT      [Oo][Bb][Jj][Ee][Cc][Tt]
 MIXED       [Mm][Ii][Xx][Ee][Dd]
 CALLABLE    [Cc][Aa][Ll]{2}[Aa][Bb][Ll][Ee]
 VOID        [Vv][Oo][Ii][Dd]
@@ -533,8 +531,6 @@ VAR         [Vv][Aa][Rr]
 <PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>{FLOAT}        { Console::LexLog(yylineno, yytext, "keyword FLOAT"); yylval.string_const = new std::string("float"); return TYPE; }
 <PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>{STRING}       { Console::LexLog(yylineno, yytext, "keyword STRING"); yylval.string_const = new std::string("string"); return TYPE; }
 <PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>{BOOL}         { Console::LexLog(yylineno, yytext, "keyword BOOL"); yylval.string_const = new std::string("bool"); return TYPE; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>{ARRAY}        { Console::LexLog(yylineno, yytext, "keyword ARRAY"); yylval.string_const = new std::string("array"); return TYPE; }
-<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>{OBJECT}       { Console::LexLog(yylineno, yytext, "keyword OBJECT"); yylval.string_const = new std::string("object"); return TYPE; }
 <PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>{MIXED}        { Console::LexLog(yylineno, yytext, "keyword MIXED"); yylval.string_const = new std::string("mixed"); return TYPE; }
 <PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>{CALLABLE}     { Console::LexLog(yylineno, yytext, "keyword CALLABLE"); yylval.string_const = new std::string("callable"); return TYPE; }
 <PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>{VOID}         { Console::LexLog(yylineno, yytext, "keyword VOID"); yylval.string_const = new std::string("void"); return TYPE; }
