@@ -1,5 +1,4 @@
 <?php
-// Функции
 function simpleFunction($param1, $param2) {
     return $param1 + $param2;
 }
@@ -8,7 +7,6 @@ function withTypes(int $number, string $text): float {
     return $number + floatval($text);
 }
 
-// Классы
 class BaseClass {
     public $publicProperty;
     protected $protectedProperty;
@@ -38,15 +36,12 @@ class DerivedClass extends BaseClass {
     }
 }
 
-// Использование классов
 $obj = new DerivedClass("test");
 $obj->publicMethod();
 DerivedClass::staticMethod();
 
-// instanceof
 $check = $obj instanceof BaseClass;
 
-// Константы класса
 class Constants {
     const CONSTANT = 'value';
     public const PUBLIC_CONST = 'public';

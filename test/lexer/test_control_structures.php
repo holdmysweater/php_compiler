@@ -1,31 +1,31 @@
 <?php
-// Условные операторы
+
 if ($condition) {
-    echo "Условие истинно";
+    echo "Condition is true";
 } elseif ($other_condition) {
-    echo "Другое условие";
+    echo "Other condition";
 } else {
-    echo "Все ложны";
+    echo "All are false";
 }
 
-// Альтернативный синтаксис if
+
 if ($condition):
-    echo "Альтернативный синтаксис";
+    echo "Alternative syntax";
 endif;
 
-// Switch
+
 switch ($value) {
     case 1:
-        echo "Один";
+        echo "One";
         break;
     case 2:
-        echo "Два";
+        echo "Two";
         break;
     default:
-        echo "По умолчанию";
+        echo "Default";
 }
 
-// Циклы
+
 for ($i = 0; $i < 10; $i++) {
     echo $i;
 }
@@ -42,7 +42,7 @@ do {
     $counter--;
 } while ($counter > 0);
 
-// Break и continue
+
 for ($i = 0; $i < 10; $i++) {
     if ($i == 5) {
         break;
