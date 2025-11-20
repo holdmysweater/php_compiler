@@ -30,7 +30,7 @@ for ($i = 0; $i < 10; $i++) {
     echo $i;
 }
 
-foreach ($array as $key => $value) {
+foreach ($arrays as $key => $value) {
     echo "Key: $key, Value: $value";
 }
 
