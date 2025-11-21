@@ -8,16 +8,20 @@
     
     <?php
     $user = "John";
-    if ($user): ?>
-        <p>Hello, <?= $user ?>!</p>
-    <?php else: ?>
-        <p>Hello, Guest!</p>
-    <?php endif; ?>
-    
+    if ($user) {
+        echo "<p>Hello, " . htmlspecialchars($user) . "!</p>";
+    } else {
+        echo "<p>Hello, Guest!</p>";
+    }
+    ?>
+
     <ul>
-    <?php for ($i = 1; $i <= 3; $i++): ?>
-        <li>Item <?= $i ?></li>
-    <?php endfor; ?>
+
+    <?php
+    for ($i = 1; $i <= 3; $i++) {
+        echo "<li>Item " . $i . "</li>";
+    }
+    ?>
     </ul>
 </body>
 </html>

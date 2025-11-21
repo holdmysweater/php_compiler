@@ -115,7 +115,9 @@ ElementNode *ElementNode::ElementList(ElementNode *element, ElementType type) {
 }
 
 ElementNode *ElementNode::AppendToElementList(ElementNode *elementList, ElementNode *newElement) {
-    elementList->children.push_back(newElement);
+    if (newElement != nullptr) {
+        elementList->children.push_back(newElement);
+    }
     elementList->WriteToJsonFile();
     return elementList;
 }

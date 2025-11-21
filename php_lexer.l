@@ -661,6 +661,19 @@ VAR         [Vv][Aa][Rr]
 <INITIAL>[^<]*	{ html->append(yytext); }
 <INITIAL>\<	    { html->append(yytext); }
 
+
+<INITIAL><<EOF>> {
+    if (!html->current().empty()) {
+        Console::LexLog(html->getStartLine() > 0 ? html->getStartLine() : 1, yylineno, html->current(), "html content");
+        yylval.string_const = new std::string(html->current());
+        html->reset();
+        html->setStartLine(yylineno);
+        return HTML_CONTENT;
+    }
+
+    return 0;
+}
+
 <*>.			{
                     Console::LexError("Unrecognized symbol '" + Buffer::CutStringEnd(yytext, 0) + "'", yylineno);
                     return ERROR;
