@@ -324,7 +324,7 @@ StmtNode *StmtNode::Case(ExprNode *expr, StmtNode *stmt) {
 
 StmtNode *StmtNode::CaseDefault(StmtNode *stmt) {
     auto node = new StmtNode();
-    node->type = ST_CASE;
+    node->type = ST_CASE_DEFAULT;
     node->stmt = stmt;
     node->WriteToJsonFile();
     return node;

@@ -17,6 +17,7 @@ enum StmtType {
     ST_ELSE,
     ST_SWITCH,
     ST_CASE,
+    ST_CASE_DEFAULT,
     ST_ECHO,
     ST_RETURN,
     ST_BREAK,
@@ -37,6 +38,7 @@ inline string toString(StmtType type) {
         case StmtType::ST_ELSE: return "ST_ELSE";
         case StmtType::ST_SWITCH: return "ST_SWITCH";
         case StmtType::ST_CASE: return "ST_CASE";
+        case StmtType::ST_CASE_DEFAULT: return "ST_CASE_DEFAULT";
         case StmtType::ST_ECHO: return "ST_ECHO";
         case StmtType::ST_RETURN: return "ST_RETURN";
         case StmtType::ST_BREAK: return "ST_BREAK";
@@ -59,6 +61,7 @@ inline string toSymbol(StmtType type) {
         case StmtType::ST_ELSE: return "else";
         case StmtType::ST_SWITCH: return "switch";
         case StmtType::ST_CASE: return "case";
+        case StmtType::ST_CASE_DEFAULT: return "default case";
         case StmtType::ST_ECHO: return "echo";
         case StmtType::ST_RETURN: return "return";
         case StmtType::ST_BREAK: return "break";
