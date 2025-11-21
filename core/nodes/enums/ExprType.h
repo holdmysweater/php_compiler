@@ -49,6 +49,7 @@ enum class ExprType {
     ET_INSTANCEOF,
     ET_POW,
     ET_PROPERTY_ACCESS,
+    ET_METHOD_ACCESS,
     ET_STATIC_PROPERTY_ACCESS,
     ET_INCREMENT_POST,
     ET_DECREMENT_POST,
@@ -121,6 +122,7 @@ inline string toString(ExprType type) {
         case ExprType::ET_INSTANCEOF: return "ET_INSTANCEOF";
         case ExprType::ET_POW: return "ET_POW";
         case ExprType::ET_PROPERTY_ACCESS: return "ET_PROPERTY_ACCESS";
+        case ExprType::ET_METHOD_ACCESS: return "ET_METHOD_ACCESS";
         case ExprType::ET_STATIC_PROPERTY_ACCESS: return "ET_STATIC_PROPERTY_ACCESS";
         case ExprType::ET_INCREMENT_POST: return "ET_INCREMENT_POST";
         case ExprType::ET_DECREMENT_POST: return "ET_DECREMENT_POST";
@@ -195,6 +197,7 @@ inline string toSymbol(ExprType type) {
         case ExprType::ET_INSTANCEOF: return "instanceof";
         case ExprType::ET_POW: return "**";
         case ExprType::ET_PROPERTY_ACCESS: return "->";
+        case ExprType::ET_METHOD_ACCESS: return "->()";
         case ExprType::ET_STATIC_PROPERTY_ACCESS: return "::";
         case ExprType::ET_INCREMENT_POST: return "++";
         case ExprType::ET_DECREMENT_POST: return "--";

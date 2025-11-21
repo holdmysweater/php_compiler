@@ -111,6 +111,8 @@ public:
 
     static ExprNode *PropertyAccess(ExprNode *left, ExprNode *right);
 
+    static ExprNode *MethodAccess(ExprNode *left, ExprNode *right, ExprNode *params);
+
     static ExprNode *StaticPropertyAccess(ExprNode *left, ExprNode *right);
 
     static ExprNode *ArrayIndex(ExprNode *array, ExprNode *index);

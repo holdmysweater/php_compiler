@@ -196,7 +196,7 @@ expression : expression LOGIC_OR expression                 { Console::ParserLog
           | '[' ']'                                         { Console::ParserLog("expression ('[' ']')"); $$ = ExprNode::Array(); }
           | expression '[' ']' '=' expression               { Console::ParserLog("expression (expression '[' ']')"); $$ = ExprNode::ArrayAppend($1, $5); }
           | '(' expression_list_empty ')'                   { Console::ParserLog("expression ('(' expression ')')"); $$ = ExprNode::Parenthesized($2); }
-          | expression_variable '(' expression_list_empty ')'        { Console::ParserLog("expression (expression '(' expression_list_empty ')')"); $$ = ExprNode::FunctionCall($1, $3); }
+          | expression '(' expression_list_empty ')'        { Console::ParserLog("expression (expression '(' expression_list_empty ')')"); $$ = ExprNode::FunctionCall($1, $3); }
           | NEW expression  { Console::ParserLog("expression (NEW expression)"); $$ = ExprNode::New($2); }
           | string          { Console::ParserLog("expression (string)"); $$ = $1; }
           | expression_variable { Console::ParserLog("expression (expression_variable)"); $$ = $1; }

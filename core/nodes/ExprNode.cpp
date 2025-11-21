@@ -442,6 +442,16 @@ ExprNode *ExprNode::PropertyAccess(ExprNode *left, ExprNode *right) {
     return node;
 }
 
+ExprNode *ExprNode::MethodAccess(ExprNode *left, ExprNode *right, ExprNode *params) {
+    auto node = new ExprNode();
+    node->type = ExprType::ET_PROPERTY_ACCESS;
+    node->children.push_back(left);
+    node->children.push_back(right);
+    node->children.push_back(params);
+    node->WriteToJsonFile();
+    return node;
+}
+
 ExprNode *ExprNode::StaticPropertyAccess(ExprNode *left, ExprNode *right) {
     auto node = new ExprNode();
     node->type = ExprType::ET_STATIC_PROPERTY_ACCESS;
