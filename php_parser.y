@@ -181,7 +181,8 @@ expression : expression LOGIC_OR expression                 { Console::ParserLog
           | expression '/' expression                       { Console::ParserLog("expression (expression '/' expression)"); $$ = ExprNode::Div($1, $3); }
           | expression INSTANCEOF expression                { Console::ParserLog("expression (expression INSTANCEOF expression)"); $$ = ExprNode::Instanceof($1, $3); }
           | expression POW expression                       { Console::ParserLog("expression (expression POW expression)"); $$ = ExprNode::Pow($1, $3); }
-          | expression PROPERTY_ACCESS expression_variable           { Console::ParserLog("expression (expression PROPERTY_ACCESS expression)"); $$ = ExprNode::PropertyAccess($1, $3); }
+          | expression PROPERTY_ACCESS expression_variable  { Console::ParserLog("expression (expression PROPERTY_ACCESS expression)"); $$ = ExprNode::PropertyAccess($1, $3); }
+          | expression PROPERTY_ACCESS expression_variable '(' expression_list_empty ')'    { Console::ParserLog("expression (expression PROPERTY_ACCESS expression_variable '(' expression_list_empty ')')"); $$ = ExprNode::MethodAccess($1, $3, $5); }
           | expression STATIC_PROPERTY_ACCESS expression_variable    { Console::ParserLog("expression (expression STATIC_PROPERTY_ACCESS expression)"); $$ = ExprNode::StaticPropertyAccess($1, $3); }
           | expression INCREMENT                            { Console::ParserLog("expression (expression INCREMENT)"); $$ = ExprNode::IncrementPost($1); }
           | expression DECREMENT                            { Console::ParserLog("expression (expression DECREMENT)"); $$ = ExprNode::DecrementPost($1); }

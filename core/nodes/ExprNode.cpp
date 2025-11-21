@@ -444,7 +444,7 @@ ExprNode *ExprNode::PropertyAccess(ExprNode *left, ExprNode *right) {
 
 ExprNode *ExprNode::MethodAccess(ExprNode *left, ExprNode *right, ExprNode *params) {
     auto node = new ExprNode();
-    node->type = ExprType::ET_PROPERTY_ACCESS;
+    node->type = ExprType::ET_METHOD_ACCESS;
     node->children.push_back(left);
     node->children.push_back(right);
     node->children.push_back(params);
