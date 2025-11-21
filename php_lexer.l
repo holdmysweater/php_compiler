@@ -579,6 +579,7 @@ VAR         [Vv][Aa][Rr]
 <PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"<=>"  	{ Console::LexLog(yylineno, yytext, "operator '<=>'"); return SPACESHIP; }
 <PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"&&"  	{ Console::LexLog(yylineno, yytext, "operator '&&'"); return LOGIC_AND; }
 <PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"||"  	{ Console::LexLog(yylineno, yytext, "operator '||'"); return LOGIC_OR; }
+<PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"??"  	{ Console::LexLog(yylineno, yytext, "operator '??'"); return NULL_COALESCING; }
 <PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"++"      { Console::LexLog(yylineno, yytext, "operator '++'"); return INCREMENT; }
 <PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"--"      { Console::LexLog(yylineno, yytext, "operator '--'"); return DECREMENT; }
 <PURE_PHP,ECHO_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"&"   	{ Console::LexLog(yylineno, yytext, "operator '&'"); return *yytext; }

@@ -91,6 +91,7 @@
 %left XOR
 %right '='  MULT_ASSIGN POW_ASSIGN DIV_ASSIGN PLUS_ASSIGN MINUS_ASSIGN CONCAT_ASSIGN LEFT_SHIFT_ASSIGN RIGHT_SHIFT_ASSIGN MOD_ASSIGN
 %left '?' ':'
+%left NULL_COALESCING
 %left LOGIC_OR
 %left LOGIC_AND
 %left '|'
@@ -169,7 +170,8 @@ expression : expression LOGIC_OR expression                 { Console::ParserLog
           | expression '>' expression                       { Console::ParserLog("expression (expression '>' expression)"); $$ = ExprNode::GreaterThan($1, $3); }
           | expression LESS_OR_EQUAL expression             { Console::ParserLog("expression (expression LESS_OR_EQUAL expression)"); $$ = ExprNode::LessOrEqual($1, $3); }
           | expression GREAT_OR_EQUAL expression            { Console::ParserLog("expression (expression GREAT_OR_EQUAL expression)"); $$ = ExprNode::GreatOrEqual($1, $3); }
-          | expression SPACESHIP expression            { Console::ParserLog("expression (expression SPACESHIP expression)"); $$ = ExprNode::Spaceship($1, $3); }
+          | expression SPACESHIP expression                 { Console::ParserLog("expression (expression SPACESHIP expression)"); $$ = ExprNode::Spaceship($1, $3); }
+          | expression NULL_COALESCING expression           { Console::ParserLog("expression (expression NULL_COALESCING expression)"); $$ = ExprNode::NullCoaslescing($1, $3); }
           | expression LEFT_SHIFT expression                { Console::ParserLog("expression (expression LEFT_SHIFT expression)"); $$ = ExprNode::LeftShift($1, $3); }
           | expression RIGHT_SHIFT expression               { Console::ParserLog("expression (expression RIGHT_SHIFT expression)"); $$ = ExprNode::RightShift($1, $3); }
           | expression '+' expression                       { Console::ParserLog("expression (expression '+' expression)"); $$ = ExprNode::Add($1, $3); }

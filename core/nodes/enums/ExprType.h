@@ -33,6 +33,7 @@ enum class ExprType {
     ET_IDENTICALLY_EQUAL,
     ET_IDENTICALLY_NOT_EQUAL,
     ET_SPACESHIP,
+    ET_NULL_COALESCING,
     ET_LESS_THAN,
     ET_GREATER_THAN,
     ET_LESS_OR_EQUAL,
@@ -104,6 +105,7 @@ inline string toString(ExprType type) {
         case ExprType::ET_IDENTICALLY_EQUAL: return "ET_IDENTICALLY_EQUAL";
         case ExprType::ET_IDENTICALLY_NOT_EQUAL: return "ET_IDENTICALLY_NOT_EQUAL";
         case ExprType::ET_SPACESHIP: return "ET_SPACESHIP";
+        case ExprType::ET_NULL_COALESCING: return "ET_NULL_COALESCING";
         case ExprType::ET_LESS_THAN: return "ET_LESS_THAN";
         case ExprType::ET_GREATER_THAN: return "ET_GREATER_THAN";
         case ExprType::ET_LESS_OR_EQUAL: return "ET_LESS_OR_EQUAL";
@@ -177,6 +179,7 @@ inline string toSymbol(ExprType type) {
         case ExprType::ET_IDENTICALLY_EQUAL: return "===";
         case ExprType::ET_IDENTICALLY_NOT_EQUAL: return "!==";
         case ExprType::ET_SPACESHIP: return "<=>";
+        case ExprType::ET_NULL_COALESCING: return "??";
         case ExprType::ET_LESS_THAN: return "<";
         case ExprType::ET_GREATER_THAN: return ">";
         case ExprType::ET_LESS_OR_EQUAL: return "<=";

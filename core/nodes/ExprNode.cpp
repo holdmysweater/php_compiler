@@ -295,6 +295,15 @@ ExprNode *ExprNode::Spaceship(ExprNode *left, ExprNode *right) {
     return node;
 }
 
+ExprNode *ExprNode::NullCoaslescing(ExprNode *left, ExprNode *right) {
+    auto node = new ExprNode();
+    node->type = ExprType::ET_NULL_COALESCING;
+    node->children.push_back(left);
+    node->children.push_back(right);
+    node->WriteToJsonFile();
+    return node;
+}
+
 ExprNode *ExprNode::LessThan(ExprNode *left, ExprNode *right) {
     auto node = new ExprNode();
     node->type = ExprType::ET_LESS_THAN;

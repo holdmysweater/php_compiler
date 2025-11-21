@@ -76,6 +76,8 @@ public:
 
     static ExprNode *Spaceship(ExprNode *left, ExprNode *right);
 
+    static ExprNode *NullCoaslescing(ExprNode *left, ExprNode *right);
+
     static ExprNode *LessThan(ExprNode *left, ExprNode *right);
 
     static ExprNode *GreaterThan(ExprNode *left, ExprNode *right);
