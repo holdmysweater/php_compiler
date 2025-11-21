@@ -117,7 +117,7 @@ public:
 
     static ExprNode *ArrayKeyAccess(ExprNode *key, ExprNode *value);
 
-    static ExprNode *ArrayAppend(ExprNode *array);
+    static ExprNode *ArrayAppend(ExprNode *array, ExprNode *element);
 
     static ExprNode *Array();
 

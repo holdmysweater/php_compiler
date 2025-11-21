@@ -469,10 +469,11 @@ ExprNode *ExprNode::ArrayKeyAccess(ExprNode *key, ExprNode *value) {
     return node;
 }
 
-ExprNode *ExprNode::ArrayAppend(ExprNode *array) {
+ExprNode *ExprNode::ArrayAppend(ExprNode *array, ExprNode *element) {
     auto node = new ExprNode();
     node->type = ExprType::ET_ARRAY_APPEND;
     node->children.push_back(array);
+    node->children.push_back(element);
     node->WriteToJsonFile();
     return node;
 }

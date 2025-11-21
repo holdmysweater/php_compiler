@@ -41,7 +41,7 @@
 %type <elementNode> program mixed_content_list mixed_content_element php_content php_program_list php_program_element
 %type <declNode> function_definition class_declaration function_definition_header parameter_function_list_empty parameter_function_list parameter_function class_member_declarations_empty class_member_declarations class_member_declaration class_const_elements property_declaration method_declaration const_elements const_element property_elements property_element
 %type <stmtNode> statement while_statement for_statement statement_list_empty foreach_statement if_statement switch_statement statement_list else_statement_empty_1 elseif_statements_1 else_statement_empty_2 elseif_statements_2 elseif_statement_1 elseif_statement_2 case_statements_empty case_statements case_statement
-%type <exprNode> expression array_element array_element_list expression_list expression_list_empty string interpolatable_elements interpolatable_element simple_interpolated_expression complex_interpolated_expression
+%type <exprNode> expression array_element array_element_list expression_list expression_list_empty string interpolatable_elements interpolatable_element simple_interpolated_expression complex_interpolated_expression expression_variable
 %type <valueNode> type_list type
 %type <modifier> visibility_modifiers declaration_modifiers
 
@@ -108,7 +108,6 @@
 %nonassoc INSTANCEOF
 %nonassoc INCREMENT DECREMENT
 %left '[' PROPERTY_ACCESS STATIC_PROPERTY_ACCESS
-%precedence '$'
 %precedence '('
 %precedence NEW
 
@@ -182,8 +181,8 @@ expression : expression LOGIC_OR expression                 { Console::ParserLog
           | expression '/' expression                       { Console::ParserLog("expression (expression '/' expression)"); $$ = ExprNode::Div($1, $3); }
           | expression INSTANCEOF expression                { Console::ParserLog("expression (expression INSTANCEOF expression)"); $$ = ExprNode::Instanceof($1, $3); }
           | expression POW expression                       { Console::ParserLog("expression (expression POW expression)"); $$ = ExprNode::Pow($1, $3); }
-          | expression PROPERTY_ACCESS expression           { Console::ParserLog("expression (expression PROPERTY_ACCESS expression)"); $$ = ExprNode::PropertyAccess($1, $3); }
-          | expression STATIC_PROPERTY_ACCESS expression    { Console::ParserLog("expression (expression STATIC_PROPERTY_ACCESS expression)"); $$ = ExprNode::StaticPropertyAccess($1, $3); }
+          | expression PROPERTY_ACCESS expression_variable           { Console::ParserLog("expression (expression PROPERTY_ACCESS expression)"); $$ = ExprNode::PropertyAccess($1, $3); }
+          | expression STATIC_PROPERTY_ACCESS expression_variable    { Console::ParserLog("expression (expression STATIC_PROPERTY_ACCESS expression)"); $$ = ExprNode::StaticPropertyAccess($1, $3); }
           | expression INCREMENT                            { Console::ParserLog("expression (expression INCREMENT)"); $$ = ExprNode::IncrementPost($1); }
           | expression DECREMENT                            { Console::ParserLog("expression (expression DECREMENT)"); $$ = ExprNode::DecrementPost($1); }
           | INCREMENT expression                            { Console::ParserLog("expression (INCREMENT expression)"); $$ = ExprNode::IncrementPre($2); }
@@ -192,21 +191,25 @@ expression : expression LOGIC_OR expression                 { Console::ParserLog
           | '~' expression                                  { Console::ParserLog("expression ('~' expression)"); $$ = ExprNode::NotBitwise($2); }
           | '+' expression %prec UPLUS                      { Console::ParserLog("expression ('+' expression %prec UPLUS)"); $$ = ExprNode::Uplus($2); }
           | '-' expression %prec UMINUS                     { Console::ParserLog("expression ('-' expression %prec UMINUS)"); $$ = ExprNode::Uminus($2); }
-          | '$' expression                                  { Console::ParserLog("expression ('$' expression)"); $$ = ExprNode::Sigil($2); }
           | '[' array_element_list ']'                      { Console::ParserLog("expression ('[' array_element_list ']')"); $$ = ExprNode::ArrayElementList($2); }
           | expression '[' expression ']'                   { Console::ParserLog("expression (expression '[' expression ']')"); $$ = ExprNode::ArrayIndex($1, $3); }
           | '[' ']'                                         { Console::ParserLog("expression ('[' ']')"); $$ = ExprNode::Array(); }
-          | expression '[' ']'                              { Console::ParserLog("expression (expression '[' ']')"); $$ = ExprNode::ArrayAppend($1); }
+          | expression '[' ']' '=' expression               { Console::ParserLog("expression (expression '[' ']')"); $$ = ExprNode::ArrayAppend($1, $5); }
           | '(' expression_list_empty ')'                   { Console::ParserLog("expression ('(' expression ')')"); $$ = ExprNode::Parenthesized($2); }
-          | expression '(' expression_list_empty ')'        { Console::ParserLog("expression (expression '(' expression_list_empty ')')"); $$ = ExprNode::FunctionCall($1, $3); }
+          | expression_variable '(' expression_list_empty ')'        { Console::ParserLog("expression (expression '(' expression_list_empty ')')"); $$ = ExprNode::FunctionCall($1, $3); }
           | NEW expression  { Console::ParserLog("expression (NEW expression)"); $$ = ExprNode::New($2); }
           | string          { Console::ParserLog("expression (string)"); $$ = $1; }
-          | ID              { Console::ParserLog("expression (ID)"); $$ = ExprNode::Id($1); }
+          | expression_variable { Console::ParserLog("expression (expression_variable)"); $$ = $1; }
           | INT             { Console::ParserLog("expression (INT)"); $$ = ExprNode::Int($1); }
           | FLOAT           { Console::ParserLog("expression (FLOAT)"); $$ = ExprNode::Float($1); }
           | BOOL            { Console::ParserLog("expression (BOOL)"); $$ = ExprNode::Bool($1); }
           | NIL             { Console::ParserLog("expression (NIL)"); $$ = ExprNode::Nil(); }
           ;
+
+expression_variable : '$' expression_variable { Console::ParserLog("expression_variable ('$' expression_variable)"); $$ = ExprNode::Sigil($2); }
+                    | ID    { Console::ParserLog("expression_variable (ID)"); $$ = ExprNode::Id($1); }
+                    ;
+
 
 array_element_list : array_element                          { Console::ParserLog("array_element_list (array_element)"); $$ = ExprNode::ExprList($1); }
                    | array_element_list ',' array_element   { Console::ParserLog("array_element_list (array_element_list ',' array_element)"); $$ = ExprNode::AppendToExprList($1, $3); }
@@ -420,8 +423,7 @@ complex_interpolated_expression : complex_interpolated_expression PROPERTY_ACCES
                   | complex_interpolated_expression '[' expression ']'                  { Console::ParserLog("complex_interpolated_expression (complex_interpolated_expression '[' expression ']')"); $$ = ExprNode::ArrayIndex($1, $3); }
                   | complex_interpolated_expression '(' expression_list_empty ')'       { Console::ParserLog("complex_interpolated_expression (complex_interpolated_expression '(' expression_list_empty ')')"); $$ = ExprNode::FunctionCall($1, $3); }
                   | '(' expression_list_empty ')'                                       { Console::ParserLog("complex_interpolated_expression ('(' expression_list_empty ')')"); $$ = ExprNode::Parenthesized($2); }
-                  | '$' expression                                                      { Console::ParserLog("complex_interpolated_expression ('$' expression)"); $$ = ExprNode::Sigil($2); }
-                  | ID                                                                  { Console::ParserLog("complex_interpolated_expression (ID)"); $$ = ExprNode::Id($1); }
+                  | expression_variable  { Console::ParserLog("complex_interpolated_expression (expression_variable)"); $$ = $1; }
                   ;
 
 %%
