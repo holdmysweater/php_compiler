@@ -186,6 +186,15 @@ ExprNode *ExprNode::DivAssign(ExprNode *left, ExprNode *right) {
     return node;
 }
 
+ExprNode *ExprNode::ModAssign(ExprNode *left, ExprNode *right) {
+    auto node = new ExprNode();
+    node->type = ExprType::ET_MOD_ASSIGN;
+    node->children.push_back(left);
+    node->children.push_back(right);
+    node->WriteToJsonFile();
+    return node;
+}
+
 ExprNode *ExprNode::PlusAssign(ExprNode *left, ExprNode *right) {
     auto node = new ExprNode();
     node->type = ExprType::ET_PLUS_ASSIGN;
@@ -271,6 +280,15 @@ ExprNode *ExprNode::IdenticallyEqual(ExprNode *left, ExprNode *right) {
 ExprNode *ExprNode::IdenticallyNotEqual(ExprNode *left, ExprNode *right) {
     auto node = new ExprNode();
     node->type = ExprType::ET_IDENTICALLY_NOT_EQUAL;
+    node->children.push_back(left);
+    node->children.push_back(right);
+    node->WriteToJsonFile();
+    return node;
+}
+
+ExprNode *ExprNode::Spaceship(ExprNode *left, ExprNode *right) {
+    auto node = new ExprNode();
+    node->type = ExprType::ET_SPACESHIP;
     node->children.push_back(left);
     node->children.push_back(right);
     node->WriteToJsonFile();

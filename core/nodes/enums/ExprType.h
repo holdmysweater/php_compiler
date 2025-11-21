@@ -21,6 +21,7 @@ enum class ExprType {
     ET_MULT_ASSIGN,
     ET_POW_ASSIGN,
     ET_DIV_ASSIGN,
+    ET_MOD_ASSIGN,
     ET_PLUS_ASSIGN,
     ET_MINUS_ASSIGN,
     ET_CONCAT_ASSIGN,
@@ -31,6 +32,7 @@ enum class ExprType {
     ET_NOT_EQUAL_BITWISE,
     ET_IDENTICALLY_EQUAL,
     ET_IDENTICALLY_NOT_EQUAL,
+    ET_SPACESHIP,
     ET_LESS_THAN,
     ET_GREATER_THAN,
     ET_LESS_OR_EQUAL,
@@ -90,6 +92,7 @@ inline string toString(ExprType type) {
         case ExprType::ET_MULT_ASSIGN: return "ET_MULT_ASSIGN";
         case ExprType::ET_POW_ASSIGN: return "ET_POW_ASSIGN";
         case ExprType::ET_DIV_ASSIGN: return "ET_DIV_ASSIGN";
+        case ExprType::ET_MOD_ASSIGN: return "ET_MOD_ASSIGN";
         case ExprType::ET_PLUS_ASSIGN: return "ET_PLUS_ASSIGN";
         case ExprType::ET_MINUS_ASSIGN: return "ET_MINUS_ASSIGN";
         case ExprType::ET_CONCAT_ASSIGN: return "ET_CONCAT_ASSIGN";
@@ -100,6 +103,7 @@ inline string toString(ExprType type) {
         case ExprType::ET_NOT_EQUAL_BITWISE: return "ET_NOT_EQUAL_BITWISE";
         case ExprType::ET_IDENTICALLY_EQUAL: return "ET_IDENTICALLY_EQUAL";
         case ExprType::ET_IDENTICALLY_NOT_EQUAL: return "ET_IDENTICALLY_NOT_EQUAL";
+        case ExprType::ET_SPACESHIP: return "ET_SPACESHIP";
         case ExprType::ET_LESS_THAN: return "ET_LESS_THAN";
         case ExprType::ET_GREATER_THAN: return "ET_GREATER_THAN";
         case ExprType::ET_LESS_OR_EQUAL: return "ET_LESS_OR_EQUAL";
@@ -161,6 +165,7 @@ inline string toSymbol(ExprType type) {
         case ExprType::ET_MULT_ASSIGN: return "*=";
         case ExprType::ET_POW_ASSIGN: return "**=";
         case ExprType::ET_DIV_ASSIGN: return "/=";
+        case ExprType::ET_MOD_ASSIGN: return "%=";
         case ExprType::ET_PLUS_ASSIGN: return "+=";
         case ExprType::ET_MINUS_ASSIGN: return "-=";
         case ExprType::ET_CONCAT_ASSIGN: return ".=";
@@ -171,6 +176,7 @@ inline string toSymbol(ExprType type) {
         case ExprType::ET_NOT_EQUAL_BITWISE: return "<>";
         case ExprType::ET_IDENTICALLY_EQUAL: return "===";
         case ExprType::ET_IDENTICALLY_NOT_EQUAL: return "!==";
+        case ExprType::ET_SPACESHIP: return "<=>";
         case ExprType::ET_LESS_THAN: return "<";
         case ExprType::ET_GREATER_THAN: return ">";
         case ExprType::ET_LESS_OR_EQUAL: return "<=";

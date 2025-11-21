@@ -51,6 +51,8 @@ public:
 
     static ExprNode *DivAssign(ExprNode *left, ExprNode *right);
 
+    static ExprNode *ModAssign(ExprNode *left, ExprNode *right);
+
     static ExprNode *PlusAssign(ExprNode *left, ExprNode *right);
 
     static ExprNode *MinusAssign(ExprNode *left, ExprNode *right);
@@ -71,6 +73,8 @@ public:
     static ExprNode *IdenticallyEqual(ExprNode *left, ExprNode *right);
 
     static ExprNode *IdenticallyNotEqual(ExprNode *left, ExprNode *right);
+
+    static ExprNode *Spaceship(ExprNode *left, ExprNode *right);
 
     static ExprNode *LessThan(ExprNode *left, ExprNode *right);
 
