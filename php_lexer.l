@@ -691,11 +691,12 @@ VAR         [Vv][Aa][Rr]
                                                                         return FLOAT;
                                                                     }
 
+<PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>\${ID}	{ logSigilAndPushId(yytext+1, "ID"); return '$'; }
 <PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>{ID}	{
-                                                            Console::LexLog(yylineno, yytext, "value ID");
-                                                            yylval.string_const = new std::string(yytext);
-                                                            return ID;
-                                                        }
+                                                    Console::LexLog(yylineno, yytext, "value ID");
+                                                    yylval.string_const = new std::string(yytext);
+                                                    return ID;
+                                                }
 
 <PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>[ \t\n]+	;
 

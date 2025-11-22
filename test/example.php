@@ -8,6 +8,7 @@
 <h1>Mixed Content</h1>
 
 <?php
+$privateProp = "test";
 $title = "Dynamic Title";
 $items = ['Item 1', 'Item 2', 'Item 3'];
 ?>
