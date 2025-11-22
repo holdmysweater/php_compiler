@@ -23,6 +23,8 @@ public:
     string stringValue;
     vector<ValueNode *> valueList;
 
+    string _getClassName() const override;
+
     string toJson() const override;
 
     string toDot() const override;

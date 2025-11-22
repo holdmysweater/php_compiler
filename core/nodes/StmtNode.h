@@ -30,6 +30,8 @@ public:
     StmtNode *elseIfStmt = nullptr;
     StmtNode *elseStmt = nullptr;
 
+    string _getClassName() const override;
+
     string toJson() const override;
 
     string toDot() const override;

@@ -13,6 +13,8 @@ public:
     DeclNode *decl = nullptr;
     StmtNode *stmt = nullptr;
 
+    string _getClassName() const override;
+
     string toJson() const override;
 
     string toDot() const override;

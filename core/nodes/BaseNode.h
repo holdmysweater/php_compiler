@@ -23,6 +23,14 @@ public:
 
     void WriteToFiles() const;
 
+    void Log(string message) const;
+
+    void Warn(string message) const;
+
+    void Error(string message) const;
+
+    virtual string _getClassName() const = 0;
+
     virtual string toJson() const = 0;
 
     virtual string toDot() const = 0;

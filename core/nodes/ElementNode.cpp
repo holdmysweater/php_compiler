@@ -4,6 +4,10 @@
 
 using json = nlohmann::json;
 
+string ElementNode::_getClassName() const {
+    return "ElementNode";
+}
+
 string ElementNode::toJson() const {
     json j;
     j["id"] = GetId();
@@ -84,6 +88,12 @@ string ElementNode::toDot() const {
 }
 
 bool ElementNode::doSemantics() const {
+    switch (type) {
+        case ELEMENT_UNKNOWN:
+
+            return false;
+    }
+
     Console::Warning("ElementNode::doSemantics is empty");
     return true;
 }

@@ -4,6 +4,7 @@
 #define CONSOLE_LOG_ENABLED
 
 #include <iostream>
+#include <cstdint>
 
 using std::string;
 
@@ -38,6 +39,12 @@ public:
     static void ParserError();
 
     static void ParserError(string message);
+
+    static void NodeLog(string message, string type, uint32_t id);
+
+    static void NodeWarning(string message, string type, uint32_t id);
+
+    static void NodeError(string message, string type, uint32_t id);
 };
 
 #endif //PHP_COMPILER_CONSOLE_H

@@ -21,7 +21,7 @@ void Console::Warning(string message) {
 
 void Console::Error(string message) {
 #ifdef CONSOLE_LOG_ENABLED
-	cout << Color::Bold() << Color::Red() << "Received error: " << message << "\n" << Color::Reset();
+	cout << Color::Bold() << Color::Red() << "\nERROR: " << message << "\n" << Color::Reset();
 #endif
 }
 
@@ -38,7 +38,7 @@ void Console::SystemError(string message) {
 }
 
 void Console::LexLog(int line, const string content, string info) {
-	Console::LexLog(line, content, info, false);
+	LexLog(line, content, info, false);
 }
 
 void Console::LexLog(int line, string content, string info, bool isSecondaryColor) {
@@ -73,7 +73,7 @@ void Console::LexLog(int lineStart, int lineEnd, string content, string info) {
 
 void Console::LexError(string message, int line) {
 #ifdef CONSOLE_LOG_ENABLED
-	cout << Color::Bold() << Color::Red() << "%LEXER% ERROR in line " << line << ": " << message << "\n" <<
+	cout << Color::Bold() << Color::Red() << "\n%LEXER% ERROR in line " << line << ": " << message << "\n" <<
 			Color::Reset();
 #endif
 }
@@ -84,12 +84,27 @@ void Console::ParserLog(string message) {
 
 void Console::ParserError() {
 #ifdef CONSOLE_LOG_ENABLED
-	cout << Color::Bold() << Color::Red() << "%PARSER% In error state\n" << Color::Reset();
+	cout << Color::Bold() << Color::Red() << "\n%PARSER% In error state\n" << Color::Reset();
 #endif
 }
 
 void Console::ParserError(string message) {
 #ifdef CONSOLE_LOG_ENABLED
-	cout << Color::Bold() << Color::Red() << "%PARSER% ERROR: " << message << "\n" << Color::Reset();
+	cout << Color::Bold() << Color::Red() << "\n%PARSER% ERROR: " << message << "\n" << Color::Reset();
+#endif
+}
+
+void Console::NodeLog(string message, string type, uint32_t id) {
+	Log(Color::Grey() + "%NODE% " + std::to_string(id) + " (" + type + "): " + message);
+}
+
+void Console::NodeWarning(string message, string type, uint32_t id) {
+	Log(Color::Bold() + Color::Yellow() + "\n%NODE% " + std::to_string(id) + " (" + type + "): " + message + "\n");
+}
+
+void Console::NodeError(string message, string type, uint32_t id) {
+#ifdef CONSOLE_LOG_ENABLED
+	cout << Color::Bold() << Color::Red() << "\n%NODE% " << std::to_string(id) << " (" << type << "): " << message <<
+			"\n" << Color::Reset();
 #endif
 }

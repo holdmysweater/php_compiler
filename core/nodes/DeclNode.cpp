@@ -4,6 +4,10 @@
 
 using json = nlohmann::json;
 
+string DeclNode::_getClassName() const {
+    return "DeclNode";
+}
+
 string DeclNode::toJson() const {
     json j;
     j["id"] = GetId();

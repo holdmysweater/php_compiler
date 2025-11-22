@@ -16,6 +16,8 @@ public:
     ValueNode *value = nullptr;
     vector<ExprNode *> children;
 
+    string _getClassName() const override;
+
     string toJson() const override;
 
     string toDot() const override;
