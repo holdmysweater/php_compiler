@@ -18,8 +18,8 @@ fs::path Config::GetOutputDir() {
     return GetExecutableDir() / "output";
 }
 
-fs::path Config::GetDotOutputDir() {
-    return GetOutputDir();
+fs::path Config::GetDebugOutputDir() {
+    return GetOutputDir() / "debug";
 }
 
 void Config::SetOutputDir(const fs::path &dir) {

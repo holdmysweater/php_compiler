@@ -13,7 +13,7 @@ public:
 
     static fs::path GetOutputDir();
 
-    static fs::path GetDotOutputDir();
+    static fs::path GetDebugOutputDir();
 
     static void SetOutputDir(const fs::path &dir);
 
