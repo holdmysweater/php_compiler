@@ -178,13 +178,17 @@ string StmtNode::toDot() const {
 StmtNode *StmtNode::StmtList(StmtNode *stmt) {
     auto node = new StmtNode();
     node->type = StmtType::ST_STMT_LIST;
-    node->children.push_back(stmt);
+    if (stmt != nullptr) {
+        node->children.push_back(stmt);
+    }
     node->WriteToJsonFile();
     return node;
 }
 
 StmtNode *StmtNode::AppendToStmtList(StmtNode *stmtList, StmtNode *newStmt) {
-    stmtList->children.push_back(newStmt);
+    if (newStmt != nullptr) {
+        stmtList->children.push_back(newStmt);
+    }
     stmtList->WriteToJsonFile();
     return stmtList;
 }
