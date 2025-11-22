@@ -34,6 +34,8 @@ public:
 
     string toDot() const override;
 
+    bool doSemantics() const override;
+
     // List
     static StmtNode *StmtList(StmtNode *stmt);
 

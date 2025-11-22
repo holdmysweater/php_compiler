@@ -1,4 +1,5 @@
 #include "ValueNode.h"
+#include "core/helpers/Console.h"
 #include "json.hpp"
 
 using json = nlohmann::json;
@@ -120,6 +121,11 @@ string ValueNode::toDot() const {
     }
 
     return result;
+}
+
+bool ValueNode::doSemantics() const {
+    Console::Warning("ValueNode::doSemantics is empty");
+    return true;
 }
 
 ValueNode *ValueNode::ValueList(ValueNode *value) {

@@ -36,6 +36,8 @@ public:
 
     string toDot() const override;
 
+    bool doSemantics() const override;
+
     // List
     static DeclNode *DeclList(DeclNode *decl);
 

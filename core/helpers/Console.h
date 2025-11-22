@@ -13,6 +13,8 @@ public:
 
     static void Log(string message);
 
+    static void Warning(string message);
+
     static void Error(string message);
 
     static void SystemLog(string message);

@@ -1,5 +1,6 @@
 #include "ExprNode.h"
 #include "json.hpp"
+#include "core/helpers/Console.h"
 
 using json = nlohmann::json;
 
@@ -59,6 +60,11 @@ string ExprNode::toDot() const {
     }
 
     return result;
+}
+
+bool ExprNode::doSemantics() const {
+    Console::Warning("ExprNode::doSemantics is empty");
+    return true;
 }
 
 // List

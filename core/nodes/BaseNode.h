@@ -27,7 +27,7 @@ public:
 
     virtual string toDot() const = 0;
 
-    // virtual string doSemantics() const = 0; TODO add to each class
+    virtual bool doSemantics() const = 0;
 };
 
 #endif //PHP_COMPILER_BASENODE_H

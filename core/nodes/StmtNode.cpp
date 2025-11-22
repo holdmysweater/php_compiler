@@ -1,4 +1,5 @@
 #include "StmtNode.h"
+#include "core/helpers/Console.h"
 #include "json.hpp"
 
 using json = nlohmann::json;
@@ -172,6 +173,11 @@ string StmtNode::toDot() const {
     }
 
     return result;
+}
+
+bool StmtNode::doSemantics() const {
+    Console::Warning("StmtNode::doSemantics is empty");
+    return true;
 }
 
 // List

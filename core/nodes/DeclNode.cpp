@@ -1,4 +1,5 @@
 #include "DeclNode.h"
+#include "core/helpers/Console.h"
 #include "json.hpp"
 
 using json = nlohmann::json;
@@ -126,6 +127,11 @@ string DeclNode::toDot() const {
     }
 
     return result;
+}
+
+bool DeclNode::doSemantics() const {
+    Console::Warning("DeclNode::doSemantics is empty");
+    return true;
 }
 
 DeclNode *DeclNode::DeclList(DeclNode *decl) {

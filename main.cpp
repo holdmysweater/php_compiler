@@ -107,7 +107,7 @@ int main(int argc, char *argv[]) {
 
     Config::SetOutputDir(outputDir + "/semantics/debug");
 
-    // TODO call semantics
+    bool result = root->doSemantics();
 
     Console::SystemLog("Generating semantics output files...");
 
@@ -117,6 +117,11 @@ int main(int argc, char *argv[]) {
         OutputManager::OutputDot(root->toDot(), "semantics_" + baseName, true);
     } catch (const std::exception &e) {
         Console::SystemError("Failed to generate output files: " + std::string(e.what()));
+        return 1;
+    }
+
+    if (!result) {
+        Console::SystemError("Tree has errors, semantics were incomplete");
         return 1;
     }
 

@@ -20,6 +20,8 @@ public:
 
     string toDot() const override;
 
+    bool doSemantics() const override;
+
     // List
     static ExprNode *ExprList(ExprNode *expr);
 

@@ -1,4 +1,5 @@
 #include "ElementNode.h"
+#include "core/helpers/Console.h"
 #include "json.hpp"
 
 using json = nlohmann::json;
@@ -97,6 +98,11 @@ string ElementNode::toDot() const {
     }
 
     return result;
+}
+
+bool ElementNode::doSemantics() const {
+    Console::Warning("ElementNode::doSemantics is empty");
+    return true;
 }
 
 ElementNode *ElementNode::EmptyElement() {

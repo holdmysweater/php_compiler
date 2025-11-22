@@ -15,6 +15,10 @@ void Console::Log(string message) {
 #endif
 }
 
+void Console::Warning(string message) {
+	Log(Color::Bold() + Color::Yellow() + "\nWARNING: " + message + "\n");
+}
+
 void Console::Error(string message) {
 #ifdef CONSOLE_LOG_ENABLED
 	cout << Color::Bold() << Color::Red() << "Received error: " << message << "\n" << Color::Reset();
