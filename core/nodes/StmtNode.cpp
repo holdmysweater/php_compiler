@@ -180,8 +180,90 @@ string StmtNode::toDot() const {
 }
 
 bool StmtNode::doSemantics() {
-    Console::Warning("StmtNode::doSemantics is empty");
-    return true;
+    Log("starting semantics for " + toString(type) + "...");
+
+    bool isOk = true;
+    switch (type) {
+        case ST_UNKNOWN:
+            Warn("unknown type");
+            return true;
+        case ST_STMT_LIST:
+            for (const auto &child: children) {
+                isOk = isOk && child->doSemantics();
+            }
+            break;
+        case ST_EXPRESSION:
+            // TODO ST_EXPRESSION
+            Warn("ST_EXPRESSION not implemented");
+            break;
+        case ST_WHILE:
+            // TODO ST_WHILE
+            Warn("ST_WHILE not implemented");
+            break;
+        case ST_DO_WHILE:
+            // TODO ST_DO_WHILE
+            Warn("ST_DO_WHILE not implemented");
+            break;
+        case ST_FOR:
+            // TODO ST_FOR
+            Warn("ST_FOR not implemented");
+            break;
+        case ST_FOREACH:
+            // TODO ST_FOREACH
+            Warn("ST_FOREACH not implemented");
+            break;
+        case ST_IF:
+            // TODO ST_IF
+            Warn("ST_IF not implemented");
+            break;
+        case ST_ELSE_IF:
+            // TODO ST_ELSE_IF
+            Warn("ST_ELSE_IF not implemented");
+            break;
+        case ST_ELSE:
+            // TODO ST_ELSE
+            Warn("ST_ELSE not implemented");
+            break;
+        case ST_SWITCH:
+            // TODO ST_SWITCH
+            Warn("ST_SWITCH not implemented");
+            break;
+        case ST_CASE:
+            // TODO ST_CASE
+            Warn("ST_CASE not implemented");
+            break;
+        case ST_CASE_DEFAULT:
+            // TODO ST_CASE_DEFAULT
+            Warn("ST_CASE_DEFAULT not implemented");
+            break;
+        case ST_ECHO:
+            // TODO ST_ECHO
+            Warn("ST_ECHO not implemented");
+            break;
+        case ST_RETURN:
+            // TODO ST_RETURN
+            Warn("ST_RETURN not implemented");
+            break;
+        case ST_BREAK:
+            // TODO ST_BREAK
+            Warn("ST_BREAK not implemented");
+            break;
+        case ST_CONTINUE:
+            // TODO ST_CONTINUE
+            Warn("ST_CONTINUE not implemented");
+            break;
+        default:
+            Error("unknown enum type");
+            return false;
+    }
+
+    if (isOk) {
+        Log("finished semantics for " + toString(type) + "");
+    } else {
+        Error("semantics for " + toString(type) + " failed");
+    }
+
+    return isOk;
 }
 
 // List
