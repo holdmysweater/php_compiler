@@ -19,8 +19,6 @@ public:
 private:
     static fs::path EnsureOutputDir();
 
-    static fs::path EnsureDebugOutputDir();
-
     static void GenerateSvgFromDot(const fs::path &dotFilePath);
 
     static void GenerateSvgFromDot(const fs::path &dotFilePath, bool isLogEnabled);

@@ -9,15 +9,11 @@ class Config {
     static fs::path customOutputDir;
 
 public:
-    static fs::path GetProjectRoot();
+    static fs::path GetExecutableDir();
 
     static fs::path GetOutputDir();
 
-    static fs::path GetDebugOutputDir();
-
     static void SetOutputDir(const fs::path &dir);
-
-    static fs::path GetExecutableDir();
 };
 
 #endif //PHP_COMPILER_CONFIG_H

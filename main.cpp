@@ -68,7 +68,10 @@ int main(int argc, char *argv[]) {
 
     Console::SystemLog("Input file: '" + inputFile + "'");
     Console::SystemLog("Output directory: '" + Config::GetOutputDir().string() + "'");
+
     Console::SystemLog("Parser initiation...");
+
+    Config::SetOutputDir(outputDir + "/parser/debug");
 
     int parse_result = yyparse();
 
@@ -90,11 +93,29 @@ int main(int argc, char *argv[]) {
     fs::path inputPath(inputFile);
     std::string baseName = inputPath.stem().string();
 
-    Console::SystemLog("Generating output files...");
+    Console::SystemLog("Generating parser output files...");
 
     try {
-        OutputManager::OutputJson(root->toJson(), baseName, true);
-        OutputManager::OutputDot(root->toDot(), baseName, true);
+        Config::SetOutputDir(outputDir + "/parser");
+        OutputManager::OutputJson(root->toJson(), "parser_" + baseName, true);
+        OutputManager::OutputDot(root->toDot(), "parser_" + baseName, true);
+    } catch (const std::exception &e) {
+        Console::SystemError("Failed to generate output files: " + std::string(e.what()));
+        return 1;
+    }
+
+    Console::SystemLog("Semantics initiation...");
+
+    Config::SetOutputDir(outputDir + "/semantics/debug");
+
+    // TODO call semantics
+
+    Console::SystemLog("Generating semantics output files...");
+
+    try {
+        Config::SetOutputDir(outputDir + "/semantics");
+        OutputManager::OutputJson(root->toJson(), "semantics_" + baseName, true);
+        OutputManager::OutputDot(root->toDot(), "semantics_" + baseName, true);
     } catch (const std::exception &e) {
         Console::SystemError("Failed to generate output files: " + std::string(e.what()));
         return 1;

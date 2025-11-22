@@ -10,12 +10,6 @@ fs::path OutputManager::EnsureOutputDir() {
     return outputDir;
 }
 
-fs::path OutputManager::EnsureDebugOutputDir() {
-    fs::path debugDir = Config::GetDebugOutputDir();
-    fs::create_directories(debugDir);
-    return debugDir;
-}
-
 void OutputManager::GenerateSvgFromDot(const fs::path &dotFilePath) {
     GenerateSvgFromDot(dotFilePath, false);
 }
@@ -40,18 +34,10 @@ void OutputManager::OutputJson(const std::string &jsonContent, const std::string
 }
 
 void OutputManager::OutputJson(const std::string &jsonContent, const std::string &baseName, bool isLogEnabled) {
-    fs::path jsonDir;
-
-    if (isLogEnabled) {
-        jsonDir = EnsureOutputDir();
-    } else {
-        jsonDir = EnsureDebugOutputDir();
-    }
-
+    fs::path jsonDir = EnsureOutputDir();
     fs::path jsonPath = jsonDir / (baseName + "_ast.json");
 
-    std::ofstream jsonFile(jsonPath);
-    if (jsonFile.is_open()) {
+    if (std::ofstream jsonFile(jsonPath); jsonFile.is_open()) {
         jsonFile << jsonContent;
         jsonFile.close();
 
@@ -68,18 +54,10 @@ void OutputManager::OutputDot(const std::string &dotContent, const std::string &
 }
 
 void OutputManager::OutputDot(const std::string &dotContent, const std::string &baseName, bool isLogEnabled) {
-    fs::path dotDir;
-
-    if (isLogEnabled) {
-        dotDir = EnsureOutputDir();
-    } else {
-        dotDir = EnsureDebugOutputDir();
-    }
-
+    fs::path dotDir = EnsureOutputDir();
     fs::path dotPath = dotDir / (baseName + "_tree.dot");
 
-    std::ofstream dotFile(dotPath);
-    if (dotFile.is_open()) {
+    if (std::ofstream dotFile(dotPath); dotFile.is_open()) {
         dotFile << "digraph {\n";
         dotFile << "  rankdir=TB;\n";
         dotFile << "  node [shape=box, fontname=\"Arial\", fontsize=10];\n";
