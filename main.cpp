@@ -100,7 +100,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    Console::SystemTitle("COMPLETED! :)");
+    Console::SystemTitle("COMPLETED");
 
     return 0;
 }
