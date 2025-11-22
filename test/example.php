@@ -1,6 +1,4 @@
 <?php
-$var = "test";
-
 function typedFunction(string|SimpleClass $param, int $anotherParam): string|int|null
 {
     $something = "string content";
@@ -18,7 +16,15 @@ class SimpleClass
     {
         return null;
     }
+
+    static function simpleFunc2(void|int $hi): void
+    {
+    }
+
+//    static function simpleFunc3(): string
+//    {
+//    }
 }
 
-$result = typedFunction("hi")
+echo SimpleClass::simpleFunc2()
 ?>

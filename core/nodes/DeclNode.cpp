@@ -2,7 +2,6 @@
 #include "core/helpers/Console.h"
 #include "json.hpp"
 #include <string>
-#include <algorithm>
 #include <cctype>
 
 using json = nlohmann::json;
@@ -184,8 +183,21 @@ bool DeclNode::doSemantics() {
             }
 
             // Semantics for parameters
-            isOk = this->params->doSemantics();
-            Warn("DT_FUNCTION/DT_METHOD not implemented");
+            if (this->params != nullptr) {
+                isOk = isOk && this->params->doSemantics();
+            } else {
+                Log("skipped params");
+            }
+
+            // Semantics for body
+            if (this->stmt != nullptr) {
+                isOk = isOk && this->stmt->doSemantics();
+            } else {
+                Log("skipped body (no stmt)");
+            }
+
+            // TODO check if all paths return something and type check for the returns
+            Warn("DT_FUNCTION/DT_METHOD implementation is unfinished");
             break;
         default:
             Error("unknown enum type");
