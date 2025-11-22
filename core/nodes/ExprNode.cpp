@@ -67,6 +67,7 @@ string ExprNode::toDot() const {
 }
 
 bool ExprNode::doSemantics() {
+    // TODO semantics for expr node
     Console::Warning("ExprNode::doSemantics is empty");
     return true;
 }

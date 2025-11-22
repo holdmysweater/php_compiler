@@ -128,6 +128,7 @@ string ValueNode::toDot() const {
 }
 
 bool ValueNode::doSemantics() {
+    // TODO semantics for value node
     Console::Warning("ValueNode::doSemantics is empty");
     return true;
 }
