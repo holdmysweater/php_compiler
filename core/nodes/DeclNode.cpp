@@ -64,7 +64,7 @@ string DeclNode::toDot() const {
     label += "(D) ";
 #endif
 
-    label += toString(type);
+    label += toSymbol(type);
 
 #ifdef DOT_DEBUG
     label += "\\n" + toString(type);
