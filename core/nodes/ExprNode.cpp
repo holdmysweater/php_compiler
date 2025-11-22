@@ -453,7 +453,9 @@ ExprNode *ExprNode::MethodAccess(ExprNode *left, ExprNode *right, ExprNode *para
     node->type = ExprType::ET_METHOD_ACCESS;
     node->children.push_back(left);
     node->children.push_back(right);
-    node->children.push_back(params);
+    if (params != nullptr) {
+        node->children.push_back(params);
+    }
     node->WriteToFiles();
     return node;
 }
