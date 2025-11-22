@@ -82,6 +82,7 @@
 %token COMPLEX_INTERPOLATION_START
 %token INTERPOLATION_END
 %token KEY_ACCESS
+%token ARRAY
 
 %left OR
 %left AND
@@ -177,11 +178,13 @@ expression : expression LOGIC_OR expression                 { Console::ParserLog
           | '+' expression %prec UPLUS                      { Console::ParserLog("expression ('+' expression %prec UPLUS)"); $$ = ExprNode::Uplus($2); }
           | '-' expression %prec UMINUS                     { Console::ParserLog("expression ('-' expression %prec UMINUS)"); $$ = ExprNode::Uminus($2); }
           | '[' array_element_list ']'                      { Console::ParserLog("expression ('[' array_element_list ']')"); $$ = ExprNode::ArrayElementList($2); }
-          | expression '[' expression ']'                   { Console::ParserLog("expression (expression '[' expression ']')"); $$ = ExprNode::ArrayIndex($1, $3); }
           | '[' ']'                                         { Console::ParserLog("expression ('[' ']')"); $$ = ExprNode::Array(); }
+          | expression '[' expression ']'                   { Console::ParserLog("expression (expression '[' expression ']')"); $$ = ExprNode::ArrayIndex($1, $3); }
           | expression '[' ']' '=' expression               { Console::ParserLog("expression (expression '[' ']' '=' expression )"); $$ = ExprNode::ArrayAppend($1, $5); }
           | '(' expression_list_empty ')'                   { Console::ParserLog("expression ('(' expression_list_empty ')')"); $$ = ExprNode::Parenthesized($2); }
           | expression '(' expression_list_empty ')'        { Console::ParserLog("expression (expression '(' expression_list_empty ')')"); $$ = ExprNode::FunctionCall($1, $3); }
+          | ARRAY '(' array_element_list ')'                { Console::ParserLog("expression (ARRAY '(' array_element_list ')')"); $$ = ExprNode::ArrayElementList($3); }
+          | ARRAY '(' ')'                                   { Console::ParserLog("expression (ARRAY '(' ')')"); $$ = ExprNode::Array(); }
           | NEW expression  { Console::ParserLog("expression (NEW expression)"); $$ = ExprNode::New($2); }
           | string          { Console::ParserLog("expression (string)"); $$ = $1; }
           | expression_variable { Console::ParserLog("expression (expression_variable)"); $$ = $1; }
