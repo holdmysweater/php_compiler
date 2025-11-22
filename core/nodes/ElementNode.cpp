@@ -9,10 +9,6 @@ string ElementNode::toJson() const {
     j["id"] = GetId();
     j["type"] = toString(type);
 
-    if (!content.empty()) {
-        j["content"] = content;
-    }
-
     if (!children.empty()) {
         json childrenArray = json::array();
         for (const auto &child: children) {
@@ -29,10 +25,6 @@ string ElementNode::toJson() const {
         j["stmt"] = json::parse(stmt->toJson());
     }
 
-    if (expr != nullptr) {
-        j["expr"] = json::parse(expr->toJson());
-    }
-
     return j.dump(2);
 }
 
@@ -44,16 +36,12 @@ string ElementNode::toDot() const {
     label += "(P) ";
 #endif
 
-    label += toString(type);
+    label += toSymbol(type);
 
 #ifdef DOT_DEBUG
     label += "\\n" + toString(type);
     label += "\\nID: " + std::to_string(GetId());
 #endif
-
-    if (!content.empty()) {
-        label += "\\nContent: " + content;
-    }
 
     std::string::size_type pos = 0;
     while ((pos = label.find('"', pos)) != std::string::npos) {
@@ -92,11 +80,6 @@ string ElementNode::toDot() const {
         result += stmt->toDot();
     }
 
-    if (expr != nullptr) {
-        result += "  node" + std::to_string(GetId()) + " -> node" + std::to_string(expr->GetId()) + " [label=expr];\n";
-        result += expr->toDot();
-    }
-
     return result;
 }
 
@@ -107,14 +90,14 @@ bool ElementNode::doSemantics() const {
 
 ElementNode *ElementNode::EmptyElement() {
     auto node = new ElementNode();
-    node->type = ElementType::ELEMENT_PROGRAM_LIST;
+    node->type = ElementType::ELEMENT_EMPTY;
     node->WriteToFiles();
     return node;
 }
 
-ElementNode *ElementNode::ElementList(ElementNode *element, ElementType type) {
+ElementNode *ElementNode::ElementList(ElementNode *element) {
     auto node = new ElementNode();
-    node->type = type;
+    node->type = ELEMENT_PROGRAM_LIST;
     if (element != nullptr) {
         node->children.push_back(element);
     }
@@ -130,9 +113,17 @@ ElementNode *ElementNode::AppendToElementList(ElementNode *elementList, ElementN
     return elementList;
 }
 
-ElementNode *ElementNode::PhpDecl(DeclNode *declList) {
+ElementNode *ElementNode::PhpClassDecl(DeclNode *declList) {
     auto node = new ElementNode();
-    node->type = ElementType::ELEMENT_STATEMENT;
+    node->type = ElementType::ELEMENT_CLASS_DECL;
+    node->decl = declList;
+    node->WriteToFiles();
+    return node;
+}
+
+ElementNode *ElementNode::PhpFuncDecl(DeclNode *declList) {
+    auto node = new ElementNode();
+    node->type = ElementType::ELEMENT_FUNC_DECL;
     node->decl = declList;
     node->WriteToFiles();
     return node;
@@ -145,22 +136,6 @@ ElementNode *ElementNode::PhpStmt(StmtNode *stmt) {
     auto node = new ElementNode();
     node->type = ElementType::ELEMENT_STATEMENT;
     node->stmt = stmt;
-    node->WriteToFiles();
-    return node;
-}
-
-ElementNode *ElementNode::PhpEchoContent(ExprNode *expr) {
-    auto node = new ElementNode();
-    node->type = ElementType::ELEMENT_ECHO_PHP;
-    node->expr = expr;
-    node->WriteToFiles();
-    return node;
-}
-
-ElementNode *ElementNode::HtmlContent(string *content) {
-    auto node = new ElementNode();
-    node->type = ElementType::ELEMENT_HTML;
-    node->content = *content;
     node->WriteToFiles();
     return node;
 }

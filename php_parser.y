@@ -10,7 +10,6 @@
     #include "core/nodes/StmtNode.h"
     #include "core/nodes/ValueNode.h"
     #include "core/nodes/enums/VisibilityType.h"
-    #include "core/nodes/enums/ElementType.h"
 
     extern ElementNode* root;
 }
@@ -118,13 +117,13 @@ program : %empty                { Console::ParserLog("program (empty)"); $$ = ro
         | ERROR                 { Console::ParserLog("program (ERROR)"); Console::ParserError("lexer returned an error"); $$ = root = nullptr; }
         ;
 
-php_program_list : php_program_element                  { Console::ParserLog("php_program_list (php_program_element)"); $$ = ElementNode::ElementList($1, ElementType::ELEMENT_PHP_LIST); }
+php_program_list : php_program_element                  { Console::ParserLog("php_program_list (php_program_element)"); $$ = ElementNode::ElementList($1); }
                  | php_program_list php_program_element { Console::ParserLog("php_program_list (php_program_list php_program_element)"); $$ = ElementNode::AppendToElementList($1, $2); }
                  ;
 
 php_program_element : statement             { Console::ParserLog("php_program_element (statement)"); $$ = ElementNode::PhpStmt($1); }
-                    | function_definition   { Console::ParserLog("php_program_element (function_definition)"); $$ = ElementNode::PhpDecl($1); }
-                    | class_declaration     { Console::ParserLog("php_program_element (class_declaration)"); $$ = ElementNode::PhpDecl($1); }
+                    | function_definition   { Console::ParserLog("php_program_element (function_definition)"); $$ = ElementNode::PhpFuncDecl($1); }
+                    | class_declaration     { Console::ParserLog("php_program_element (class_declaration)"); $$ = ElementNode::PhpClassDecl($1); }
                     ;
 
 expression : expression LOGIC_OR expression                 { Console::ParserLog("expression (expression LOGIC_OR expression)"); $$ = ExprNode::Or($1, $3); }

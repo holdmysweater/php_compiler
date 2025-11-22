@@ -12,8 +12,6 @@ public:
 
     DeclNode *decl = nullptr;
     StmtNode *stmt = nullptr;
-    ExprNode *expr = nullptr;
-    string content;
 
     string toJson() const override;
 
@@ -24,18 +22,16 @@ public:
     // List
     static ElementNode *EmptyElement();
 
-    static ElementNode *ElementList(ElementNode *element, ElementType type);
+    static ElementNode *ElementList(ElementNode *element);
 
     static ElementNode *AppendToElementList(ElementNode *elementList, ElementNode *newElement);
 
     // Base
-    static ElementNode *PhpDecl(DeclNode *declList);
+    static ElementNode *PhpClassDecl(DeclNode *declList);
+
+    static ElementNode *PhpFuncDecl(DeclNode *declList);
 
     static ElementNode *PhpStmt(StmtNode *stmt);
-
-    static ElementNode *PhpEchoContent(ExprNode *expr);
-
-    static ElementNode *HtmlContent(string *content);
 };
 
 #endif //PHP_COMPILER_ELEMENTNODE_H
