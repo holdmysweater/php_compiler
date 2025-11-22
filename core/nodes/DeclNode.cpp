@@ -98,7 +98,7 @@ string DeclNode::toDot() const {
     }
 
     if (visibilityType != VisibilityType::VISIBILITY_UNKNOWN) {
-        label += "\\nVisibility: " + toString(visibilityType);
+        label += "\\nVisibility: " + toSymbol(visibilityType);
     }
 
     std::string::size_type pos = 0;
@@ -172,12 +172,8 @@ bool DeclNode::doSemantics() {
                 Log("skipped decl list");
             }
 
-            // TODO maybe check if the function names / var names are the same?
+            //!!! TODO maybe check if the function names / var / const names are the same (separately)
             Warn("DT_CLASS implementation is unfinished");
-            break;
-        case DT_VARIABLE:
-            // TODO var logic
-            Warn("DT_VARIABLE not implemented");
             break;
         case DT_PROPERTY:
             // TODO property logic
@@ -185,7 +181,7 @@ bool DeclNode::doSemantics() {
             break;
         case DT_PARAMETER:
             // TODO parameter logic
-            Warn("DT_PROPERTY not implemented");
+            Warn("DT_PARAMETER not implemented");
             break;
         case DT_CONSTANT:
             // TODO const logic
@@ -212,7 +208,7 @@ bool DeclNode::doSemantics() {
                 Log("skipped body (no stmt)");
             }
 
-            // TODO check if all paths return something and type check for the returns
+            //!!! TODO check if all paths return something and type check for the returns
             Warn("DT_FUNCTION/DT_METHOD implementation is unfinished");
             break;
         default:
@@ -311,6 +307,7 @@ DeclNode *DeclNode::ClassDecl(string *className, string *extendedClassName, Decl
 
 DeclNode *DeclNode::PropertyDecl(string *name) {
     auto node = new DeclNode();
+    node->visibilityType = VISIBILITY_PUBLIC;
     node->type = DT_PROPERTY;
     node->name = *name;
     node->WriteToFiles();
@@ -319,6 +316,7 @@ DeclNode *DeclNode::PropertyDecl(string *name) {
 
 DeclNode *DeclNode::PropertyDecl(string *name, ExprNode *expr) {
     auto node = new DeclNode();
+    node->visibilityType = VISIBILITY_PUBLIC;
     node->type = DT_PROPERTY;
     node->name = *name;
     node->expr = expr;
@@ -328,6 +326,7 @@ DeclNode *DeclNode::PropertyDecl(string *name, ExprNode *expr) {
 
 DeclNode *DeclNode::ConstDecl(string *name, ExprNode *expr) {
     auto node = new DeclNode();
+    node->visibilityType = VISIBILITY_PUBLIC;
     node->type = DT_CONSTANT;
     node->name = *name;
     node->expr = expr;

@@ -12,17 +12,19 @@
 
 class SimpleClass
 {
-    var string|null $var = "hi";
+    var string|null $vars = "hi";
+    const vars = "hi", something = "no";
+
     private static string|null $_var = "bye";
 
-//    private function simpleFunc(): string|int|null
-//    {
-//        return null;
-//    }
-//
-//    static function simpleFunc2(int $hi): void
-//    {
-//    }
+    private function simpleFunc(): string|int|null
+    {
+        return null;
+    }
+
+    static function simpleFunc2(int $hi): void
+    {
+    }
 
 //    static function simpleFunc3(): string
 //    {
