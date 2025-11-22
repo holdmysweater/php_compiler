@@ -5,7 +5,7 @@
 
 class RawDeclModifier {
 public:
-    VisibilityType visibility = VISIBILITY_UNKNOWN;
+    VisibilityType visibility = VISIBILITY_PUBLIC;
     bool isStatic = false;
 
     RawDeclModifier(VisibilityType visibility, bool isStatic);
