@@ -17,7 +17,7 @@ extern int yyparse();
 ElementNode *root;
 
 int main(int argc, char *argv[]) {
-    Console::SystemTitle("PHP LEXER & PARSER");
+    Console::SystemTitle("PHP TRANSLATOR");
 
     if (argc < 4) {
         Console::SystemError(
@@ -68,7 +68,7 @@ int main(int argc, char *argv[]) {
     Console::SystemLog("Input file: '" + inputFile + "'");
     Console::SystemLog("Output directory: '" + Config::GetOutputDir().string() + "'");
 
-    Console::SystemLog("Parser initiation...");
+    Console::SystemTitle("Parser initiation...");
 
     Config::SetOutputDir(outputDir + "/parser/debug");
 
@@ -103,7 +103,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    Console::SystemLog("Semantics initiation...");
+    Console::SystemTitle("Semantics initiation...");
 
     Config::SetOutputDir(outputDir + "/semantics/debug");
 
@@ -120,7 +120,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    // Console::SystemLog("Bytecode initiation...");
+    // Console::SystemTitle("Bytecode initiation...");
     //
     // Config::SetOutputDir(outputDir + "/bytecode/debug");
     //

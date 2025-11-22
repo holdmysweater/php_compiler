@@ -3,7 +3,7 @@
 
 void Console::SystemTitle(string title) {
 #ifdef CONSOLE_LOG_ENABLED
-	Log(Color::Bold() + Color::Blue() + "=============================");
+	Log(Color::Bold() + Color::Blue() + "\n=============================");
 	Log(Color::Bold() + Color::Blue() + title);
 	Log(Color::Bold() + Color::Blue() + "=============================\n");
 #endif

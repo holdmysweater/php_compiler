@@ -99,7 +99,7 @@ VAR         [Vv][Aa][Rr]
 
 %{
     if (!initialized) {
-        Console::SystemLog("Lexer initiation...");
+        Console::SystemTitle("Lexer initiation...");
 
         buffer = new Buffer();
         buffer->reset();
