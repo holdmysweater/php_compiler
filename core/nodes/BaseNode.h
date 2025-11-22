@@ -26,6 +26,8 @@ public:
     virtual string toJson() const = 0;
 
     virtual string toDot() const = 0;
+
+    // virtual string doSemantics() const = 0; TODO add to each class
 };
 
 #endif //PHP_COMPILER_BASENODE_H
