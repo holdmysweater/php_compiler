@@ -109,7 +109,9 @@ ElementNode *ElementNode::EmptyElement() {
 ElementNode *ElementNode::ElementList(ElementNode *element, ElementType type) {
     auto node = new ElementNode();
     node->type = type;
-    node->children.push_back(element);
+    if (element != nullptr) {
+        node->children.push_back(element);
+    }
     node->WriteToJsonFile();
     return node;
 }
@@ -131,6 +133,9 @@ ElementNode *ElementNode::PhpDecl(DeclNode *declList) {
 }
 
 ElementNode *ElementNode::PhpStmt(StmtNode *stmt) {
+    if (stmt == nullptr) {
+        return nullptr;
+    }
     auto node = new ElementNode();
     node->type = ElementType::ELEMENT_STATEMENT;
     node->stmt = stmt;

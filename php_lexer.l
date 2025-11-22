@@ -198,35 +198,10 @@ VAR         [Vv][Aa][Rr]
                                     return 0;
                                 }
 
-"<!--"					{
-                            BEGIN(states->pushAndPeek(COMMENT_HTML));
-                            buffer->reset();
-                            buffer->setStartLine(yylineno);
-                            buffer->append(yytext);
-
-                            if (!html->current().empty()) {
-                                tokens->push(Token(Token::Type::TOKEN_STRING, html->current()));
-                                tokens->push(Token(';', Token::Type::TOKEN));
-                                html->reset();
-                                html->setStartLine(yylineno);
-                                return ECHO_KW;
-                            }
-                        }
-<COMMENT_HTML>[^\-]+	{ buffer->append(yytext); }
-<COMMENT_HTML>"-"		{ buffer->append(yytext); }
-<COMMENT_HTML>\-{2}\>	{
-                            buffer->append(yytext);
-
-                            Console::LexLog(buffer->getStartLine(), yylineno, buffer->current(), "html comment");
-                            tokens->push(Token(Token::Type::TOKEN_STRING, buffer->current()));
-                            tokens->push(Token(';', Token::Type::TOKEN));
-
-                            buffer->reset();
-                            buffer->setStartLine(yylineno);
-                            BEGIN(states->popAndPeek());
-
-                            return ECHO_KW;
-                        }
+"<!--"					{ BEGIN(states->pushAndPeek(COMMENT_HTML)); html->append(yytext); }
+<COMMENT_HTML>[^\-]+	{ html->append(yytext); }
+<COMMENT_HTML>"-"		{ html->append(yytext); }
+<COMMENT_HTML>\-{2}\>	{ html->append(yytext); BEGIN(states->popAndPeek()); }
 
 <PURE_PHP,ECHO_PHP>("//"|"#").*  { Console::LexLog(yylineno, yytext, "comment", true); }
 
