@@ -1,21 +1,17 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Test Page</title>
-    <!-- HTML comment -->
-</head>
-<body>
-<h1>Mixed Content</h1>
-
 <?php
 $var = "test";
 
-function typedFunction(int $param): string {
+function typedFunction(string | SimpleClass $param): string | int | null {
+    $something = "string content";
+
+    if ($something == "string") {
+        return "string";
+    }
+
     return "Number: " . $param;
 }
 
 class SimpleClass {}
 
+$result = typedFunction("hi")
 ?>
-</body>
-</html>

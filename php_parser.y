@@ -2,14 +2,7 @@
     #include <string.h>
     #include <memory>
     #include "core/helpers/Console.h"
-    #include "core/nodes/BaseNode.h"
-    #include "core/nodes/DeclNode.h"
     #include "core/nodes/ElementNode.h"
-    #include "core/nodes/ExprNode.h"
-    #include "core/nodes/RawDeclModifier.h"
-    #include "core/nodes/StmtNode.h"
-    #include "core/nodes/ValueNode.h"
-    #include "core/nodes/enums/VisibilityType.h"
 
     extern ElementNode* root;
 }
@@ -384,8 +377,8 @@ property_element : '$' ID               { Console::ParserLog("property_element (
               | '$' ID '=' expression   { Console::ParserLog("property_element ('$' ID '=' expression)"); $$ = DeclNode::PropertyDecl($2, $4); }
               ;
 
-method_declaration : function_definition                    { Console::ParserLog("method_declaration (function_definition)"); $$ = $1; }
-                | declaration_modifiers function_definition { Console::ParserLog("method_declaration (declaration_modifiers function_definition)"); $$ = DeclNode::SetModsToDecl($2, $1); }
+method_declaration : function_definition                    { Console::ParserLog("method_declaration (function_definition)"); $$ = DeclNode::SetTypeToDecl($1, DeclType::DT_METHOD); }
+                | declaration_modifiers function_definition { Console::ParserLog("method_declaration (declaration_modifiers function_definition)"); $$ = DeclNode::SetTypeToDecl(DeclNode::SetModsToDecl($2, $1), DeclType::DT_METHOD); }
                 ;
 
 string: STRING                                                              { Console::ParserLog("string (STRING)"); $$ = ExprNode::String($1); }

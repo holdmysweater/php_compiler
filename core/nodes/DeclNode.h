@@ -47,6 +47,8 @@ public:
 
     static DeclNode *SetModsToDecl(DeclNode *decl, RawDeclModifier *modifier);
 
+    static DeclNode *SetTypeToDecl(DeclNode *decl, DeclType type);
+
     // Declarations
     static DeclNode *ClassDecl(string *className, DeclNode *declList);
 

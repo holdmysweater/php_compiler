@@ -134,8 +134,51 @@ string DeclNode::toDot() const {
 }
 
 bool DeclNode::doSemantics() const {
-    Console::Warning("DeclNode::doSemantics is empty");
-    return true;
+    Log("starting semantics for " + toString(type) + "...");
+
+    bool isOk = true;
+    switch (type) {
+        case DT_UNKNOWN:
+            Warn("unknown type");
+            return true;
+        case DT_LIST:
+            for (const auto &child: children) {
+                isOk = isOk && child->doSemantics();
+            }
+            break;
+        case DT_CLASS:
+            Warn("DT_CLASS not implemented");
+            break;
+        case DT_VARIABLE:
+            Warn("DT_VARIABLE not implemented");
+            break;
+        case DT_PROPERTY:
+            Warn("DT_PROPERTY not implemented");
+            break;
+        case DT_PARAMETER:
+            Warn("DT_PROPERTY not implemented");
+            break;
+        case DT_CONSTANT:
+            Warn("DT_CONSTANT not implemented");
+            break;
+        case DT_FUNCTION:
+            Warn("DT_FUNCTION not implemented");
+            break;
+        case DT_METHOD:
+            Warn("DT_METHOD not implemented");
+            break;
+        default:
+            Error("unknown enum type");
+            return false;
+    }
+
+    if (isOk) {
+        Log("finished semantics for " + toString(type) + "");
+    } else {
+        Error("semantics for " + toString(type) + " failed");
+    }
+
+    return isOk;
 }
 
 DeclNode *DeclNode::DeclList(DeclNode *decl) {
@@ -163,6 +206,11 @@ DeclNode *DeclNode::SetModsToDecl(DeclNode *decl, RawDeclModifier *modifier) {
         decl->isStatic = modifier->isStatic;
     }
     decl->WriteToFiles();
+    return decl;
+}
+
+DeclNode *DeclNode::SetTypeToDecl(DeclNode *decl, DeclType type) {
+    decl->type = type;
     return decl;
 }
 
