@@ -64,13 +64,13 @@ string DeclNode::toDot() const {
     string result;
     string label;
 
-#ifdef DOT_DEBUG
+#ifdef BASENODE_DOT_DEBUG
     label += "(D) ";
 #endif
 
     label += toSymbol(type);
 
-#ifdef DOT_DEBUG
+#ifdef BASENODE_DOT_DEBUG
     label += "\\n" + toString(type);
     label += "\\nID: " + std::to_string(GetId());
 #endif

@@ -93,13 +93,13 @@ string StmtNode::toDot() const {
     string result;
     string label;
 
-#ifdef DOT_DEBUG
+#ifdef BASENODE_DOT_DEBUG
     label += "(S) ";
 #endif
 
     label += toSymbol(type);
 
-#ifdef DOT_DEBUG
+#ifdef BASENODE_DOT_DEBUG
     label += "\\n" + toString(type);
     label += "\\nID: " + std::to_string(GetId());
 #endif

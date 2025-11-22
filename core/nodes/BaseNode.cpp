@@ -11,6 +11,7 @@ uint32_t BaseNode::maxId = 0;
 uint32_t BaseNode::GetId() const { return id; }
 
 void BaseNode::WriteToFiles() const {
+#ifdef BASENODE_FILE_DEBUG
     try {
         Log("updating debug files");
         OutputManager::OutputJson(this->toJson(), std::to_string(this->GetId()));
@@ -18,6 +19,7 @@ void BaseNode::WriteToFiles() const {
     } catch (const std::exception &e) {
         Console::SystemError("Failed to generate output files: " + std::string(e.what()));
     }
+#endif
 }
 
 void BaseNode::Log(string message) const {

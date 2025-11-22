@@ -36,13 +36,13 @@ string ElementNode::toDot() const {
     string result;
     string label;
 
-#ifdef DOT_DEBUG
+#ifdef BASENODE_DOT_DEBUG
     label += "(P) ";
 #endif
 
     label += toSymbol(type);
 
-#ifdef DOT_DEBUG
+#ifdef BASENODE_DOT_DEBUG
     label += "\\n" + toString(type);
     label += "\\nID: " + std::to_string(GetId());
 #endif
@@ -88,9 +88,38 @@ string ElementNode::toDot() const {
 }
 
 bool ElementNode::doSemantics() const {
+    bool isOk = true;
     switch (type) {
         case ELEMENT_UNKNOWN:
+            Warn("unknown type");
+            return true;
+        case ELEMENT_EMPTY:
+            Warn("empty");
+            return true;
+        case ELEMENT_PROGRAM_LIST:
+            Log("starting semantics for children of ELEMENT_PROGRAM_LIST...");
+             for (const auto &child: children) {
+                isOk &= child->doSemantics();
+            }
 
+            if (isOk) {
+                Log("finished semantics for children of ELEMENT_PROGRAM_LIST!");
+            } else {
+                Error("semantics for children of ELEMENT_PROGRAM_LIST failed");
+            }
+
+            return isOk;
+        case ELEMENT_STATEMENT:
+            Warn("statement");
+            return true;
+        case ELEMENT_CLASS_DECL:
+            Warn("class decl");
+            return true;
+        case ELEMENT_FUNC_DECL:
+            Warn("function decl");
+            return false;
+        default:
+            Error("unknown enum type");
             return false;
     }
 
