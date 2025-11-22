@@ -156,8 +156,6 @@ string Token::toString() const {
             return "{ ID = '" + this->value_string + "' }";
         case Type::TOKEN_TYPE:
             return "{ TYPE = '" + this->value_string + "' }";
-        case Type::TOKEN_HTML:
-            return "{ HTML = '" + this->value_string + "' }";
         case Type::TOKEN:
             return "{ TOKEN = '" + TokenIdToString(this->value_int) + "' }";
         default:

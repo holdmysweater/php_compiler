@@ -138,10 +138,6 @@ VAR         [Vv][Aa][Rr]
                 yylval.string_const = new std::string(token.value_string);
                 return TYPE;
 
-            case Token::Type::TOKEN_HTML:
-                yylval.string_const = new std::string(token.value_string);
-                return HTML_CONTENT;
-
             case Token::Type::TOKEN:
                 return token.value_int;
         }
@@ -157,12 +153,13 @@ VAR         [Vv][Aa][Rr]
                             BEGIN(states->pushAndPeek(ECHO_PHP));
 
                             if (!html->current().empty()) {
-                                tokens->push(Token(START_ECHO_TAG, Token::Type::TOKEN));
-                                yylval.string_const = new std::string(html->current());
-                                return HTML_CONTENT;
+                                tokens->push(Token(Token::Type::TOKEN_STRING, html->current()));
+                                tokens->push(Token(';', Token::Type::TOKEN));
+                                tokens->push(Token(ECHO_KW, Token::Type::TOKEN));
+                                return ECHO_KW;
                             }
 
-                            return START_ECHO_TAG;
+                            return ECHO_KW;
                         }
 
 \<\?([pP][hH][pP])?		{
@@ -174,12 +171,10 @@ VAR         [Vv][Aa][Rr]
                             BEGIN(states->pushAndPeek(PURE_PHP));
 
                             if (!html->current().empty()) {
-                                tokens->push(Token(START_TAG, Token::Type::TOKEN));
-                                yylval.string_const = new std::string(html->current());
-                                return HTML_CONTENT;
+                                tokens->push(Token(Token::Type::TOKEN_STRING, html->current()));
+                                tokens->push(Token(';', Token::Type::TOKEN));
+                                return ECHO_KW;
                             }
-
-                            return START_TAG;
                         }
 
 <PURE_PHP,ECHO_PHP>\?\>			{
@@ -196,7 +191,7 @@ VAR         [Vv][Aa][Rr]
                                     html->reset();
                                     html->setStartLine(yylineno);
 
-                                    return END_TAG;
+                                    return 0;
                                 }
 
 "<!--"					{
@@ -211,13 +206,14 @@ VAR         [Vv][Aa][Rr]
                             buffer->append(yytext);
 
                             Console::LexLog(buffer->getStartLine(), yylineno, buffer->current(), "html comment");
-                            yylval.string_const = new std::string(buffer->current());
+                            tokens->push(Token(Token::Type::TOKEN_STRING, buffer->current()));
+                            tokens->push(Token(';', Token::Type::TOKEN));
 
                             buffer->reset();
                             buffer->setStartLine(yylineno);
                             BEGIN(states->popAndPeek());
 
-                            return HTML_CONTENT;
+                            return ECHO_KW;
                         }
 
 <PURE_PHP,ECHO_PHP>("//"|"#").*  { Console::LexLog(yylineno, yytext, "comment", true); }
@@ -666,10 +662,13 @@ VAR         [Vv][Aa][Rr]
 <INITIAL><<EOF>> {
     if (!html->current().empty()) {
         Console::LexLog(html->getStartLine() > 0 ? html->getStartLine() : 1, yylineno, html->current(), "html content");
-        yylval.string_const = new std::string(html->current());
+        tokens->push(Token(Token::Type::TOKEN_STRING, html->current()));
+        tokens->push(Token(';', Token::Type::TOKEN));
+
         html->reset();
         html->setStartLine(yylineno);
-        return HTML_CONTENT;
+
+        return ECHO_KW;
     }
 
     return 0;

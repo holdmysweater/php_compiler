@@ -13,7 +13,6 @@ public:
         TOKEN_STRING,
         TOKEN_IDENTIFIER,
         TOKEN_TYPE,
-        TOKEN_HTML,
         TOKEN
     };
 
