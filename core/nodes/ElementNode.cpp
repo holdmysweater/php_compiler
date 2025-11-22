@@ -1,5 +1,4 @@
 #include "ElementNode.h"
-#include "core/helpers/Console.h"
 #include "json.hpp"
 
 using json = nlohmann::json;
@@ -88,6 +87,8 @@ string ElementNode::toDot() const {
 }
 
 bool ElementNode::doSemantics() const {
+    Log("starting semantics for " + toString(type) + "...");
+
     bool isOk = true;
     switch (type) {
         case ELEMENT_UNKNOWN:
@@ -97,34 +98,31 @@ bool ElementNode::doSemantics() const {
             Warn("empty");
             return true;
         case ELEMENT_PROGRAM_LIST:
-            Log("starting semantics for children of ELEMENT_PROGRAM_LIST...");
             for (const auto &child: children) {
                 isOk = isOk && child->doSemantics();
             }
-
-            if (isOk) {
-                Log("finished semantics for children of ELEMENT_PROGRAM_LIST!");
-            } else {
-                Error("semantics for children of ELEMENT_PROGRAM_LIST failed");
-            }
-
-            return isOk;
+            break;
         case ELEMENT_STATEMENT:
-            Warn("statement");
-            return true;
         case ELEMENT_CLASS_DECL:
-            Warn("class decl");
-            return true;
         case ELEMENT_FUNC_DECL:
-            Warn("function decl");
-            return true;
+            if (type == ELEMENT_STATEMENT) {
+                isOk = this->stmt->doSemantics();
+            } else {
+                isOk = this->decl->doSemantics();
+            }
+            break;
         default:
             Error("unknown enum type");
             return false;
     }
 
-    Console::Warning("ElementNode::doSemantics is empty");
-    return true;
+    if (isOk) {
+        Log("finished semantics for " + toString(type) + "");
+    } else {
+        Error("semantics for " + toString(type) + " failed");
+    }
+
+    return isOk;
 }
 
 ElementNode *ElementNode::EmptyElement() {
