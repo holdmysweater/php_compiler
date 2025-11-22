@@ -94,3 +94,27 @@ void OutputManager::OutputDot(const std::string &dotContent, const std::string &
         Console::SystemError("Could not write DOT file to '" + dotPath.string() + "'");
     }
 }
+
+void OutputManager::OutputBytecode(const std::vector<uint8_t> &bytecode, const std::string &baseName) {
+    fs::path bytecodeDir = EnsureOutputDir();
+    fs::path classFilePath = bytecodeDir / (baseName + ".class");
+
+    if (std::ofstream classFile(classFilePath, std::ios::binary); classFile.is_open()) {
+        classFile.write(reinterpret_cast<const char *>(bytecode.data()), bytecode.size());
+        classFile.close();
+
+        Console::SystemLog("Bytecode file generated: '" + classFilePath.string() + "'");
+        Console::SystemLog("Executing bytecode...");
+
+        std::string cmd = "java -cp \"" + bytecodeDir.string() + "\" " + baseName;
+        int exec_result = system(cmd.c_str());
+
+        if (exec_result == 0) {
+            Console::SystemLog("Bytecode execution successful!");
+        } else {
+            Console::SystemError("Bytecode execution failed!");
+        }
+    } else {
+        Console::SystemError("Could not write bytecode file to '" + classFilePath.string() + "'");
+    }
+}

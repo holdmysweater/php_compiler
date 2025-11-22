@@ -1,4 +1,3 @@
-#define _CRT_SECURE_NO_WARNINGS
 #include <iostream>
 #include <fstream>
 #include <filesystem>
@@ -120,6 +119,25 @@ int main(int argc, char *argv[]) {
         Console::SystemError("Failed to generate output files: " + std::string(e.what()));
         return 1;
     }
+
+    // Console::SystemLog("Bytecode initiation...");
+    //
+    // Config::SetOutputDir(outputDir + "/bytecode/debug");
+    //
+    // // TODO call bytecode
+    //
+    // Console::SystemLog("Generating bytecode output files...");
+    //
+    // try {
+    //     Config::SetOutputDir(outputDir + "/bytecode");
+    //     vector<uint8_t> bytecode = {
+    //         /* ... */
+    //     };
+    //     OutputManager::OutputBytecode(bytecode, "bytecode_" + baseName);
+    // } catch (const std::exception &e) {
+    //     Console::SystemError("Failed to generate output files: " + std::string(e.what()));
+    //     return 1;
+    // }
 
     Console::SystemTitle("COMPLETED");
 

@@ -3,6 +3,7 @@
 
 #include <string>
 #include <filesystem>
+#include <vector>
 
 namespace fs = std::filesystem;
 
@@ -15,6 +16,8 @@ public:
     static void OutputDot(const std::string &dotContent, const std::string &baseName);
 
     static void OutputDot(const std::string &dotContent, const std::string &baseName, bool isLogEnabled);
+
+    static void OutputBytecode(const std::vector<uint8_t> &bytecode, const std::string &baseName);
 
 private:
     static fs::path EnsureOutputDir();
