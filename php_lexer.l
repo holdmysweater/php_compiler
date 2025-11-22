@@ -156,6 +156,8 @@ VAR         [Vv][Aa][Rr]
                                 tokens->push(Token(Token::Type::TOKEN_STRING, html->current()));
                                 tokens->push(Token(';', Token::Type::TOKEN));
                                 tokens->push(Token(ECHO_KW, Token::Type::TOKEN));
+                                html->reset();
+                                html->setStartLine(yylineno);
                                 return ECHO_KW;
                             }
 
@@ -173,6 +175,8 @@ VAR         [Vv][Aa][Rr]
                             if (!html->current().empty()) {
                                 tokens->push(Token(Token::Type::TOKEN_STRING, html->current()));
                                 tokens->push(Token(';', Token::Type::TOKEN));
+                                html->reset();
+                                html->setStartLine(yylineno);
                                 return ECHO_KW;
                             }
                         }
@@ -199,6 +203,14 @@ VAR         [Vv][Aa][Rr]
                             buffer->reset();
                             buffer->setStartLine(yylineno);
                             buffer->append(yytext);
+
+                            if (!html->current().empty()) {
+                                tokens->push(Token(Token::Type::TOKEN_STRING, html->current()));
+                                tokens->push(Token(';', Token::Type::TOKEN));
+                                html->reset();
+                                html->setStartLine(yylineno);
+                                return ECHO_KW;
+                            }
                         }
 <COMMENT_HTML>[^\-]+	{ buffer->append(yytext); }
 <COMMENT_HTML>"-"		{ buffer->append(yytext); }
