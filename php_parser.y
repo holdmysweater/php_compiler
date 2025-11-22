@@ -76,7 +76,6 @@
 %token RETURN
 %token STATIC
 %token VAR
-%token END_TAG
 %token INTERPOLATABLE_START
 %token INTERPOLATABLE_END
 %token SIMPLE_INTERPOLATION_START
@@ -213,23 +212,20 @@ expression_list_empty : %empty          { Console::ParserLog("expression_list_em
                       | expression_list { Console::ParserLog("expression_list_empty (expression_list)"); $$ = $1; }
                       ;
 
-stmt_end : ';'
-         | END_TAG
-         ;
 
-statement : '{' statement_list_empty '}'        { Console::ParserLog("statement ('{' statement_list_empty '}')"); $$ = $2; }
-          | expression stmt_end                 { Console::ParserLog("statement (expression stmt_end)"); $$ = StmtNode::ExprStmt($1); }
-          | while_statement                     { Console::ParserLog("statement (while_statement)"); $$ = $1; }
-          | for_statement                       { Console::ParserLog("statement (for_statement)"); $$ = $1; }
-          | foreach_statement                   { Console::ParserLog("statement (foreach_statement)"); $$ = $1; }
-          | if_statement                        { Console::ParserLog("statement (if_statement)"); $$ = $1; }
-          | switch_statement                    { Console::ParserLog("statement (switch_statement)"); $$ = $1; }
-          | ECHO_KW expression_list stmt_end    { Console::ParserLog("statement (ECHO_KW expression_list stmt_end)"); $$ = StmtNode::Echo($2); }
-          | RETURN expression stmt_end          { Console::ParserLog("statement (RETURN expression stmt_end)"); $$ = StmtNode::ReturnStmt($2); }
-          | RETURN stmt_end                     { Console::ParserLog("statement (RETURN stmt_end)"); $$ = StmtNode::ReturnStmt(); }
-          | BREAK stmt_end                      { Console::ParserLog("statement (BREAK stmt_end)"); $$ = StmtNode::BreakStmt(); }
-          | CONTINUE stmt_end                   { Console::ParserLog("statement (CONTINUE stmt_end)"); $$ = StmtNode::ContinueStmt(); }
-          | stmt_end                            { Console::ParserLog("statement (stmt_end)"); $$ = nullptr; }
+statement : '{' statement_list_empty '}'    { Console::ParserLog("statement ('{' statement_list_empty '}')"); $$ = $2; }
+          | expression ';'                  { Console::ParserLog("statement (expression ';')"); $$ = StmtNode::ExprStmt($1); }
+          | while_statement                 { Console::ParserLog("statement (while_statement)"); $$ = $1; }
+          | for_statement                   { Console::ParserLog("statement (for_statement)"); $$ = $1; }
+          | foreach_statement               { Console::ParserLog("statement (foreach_statement)"); $$ = $1; }
+          | if_statement                    { Console::ParserLog("statement (if_statement)"); $$ = $1; }
+          | switch_statement                { Console::ParserLog("statement (switch_statement)"); $$ = $1; }
+          | ECHO_KW expression_list ';'     { Console::ParserLog("statement (ECHO_KW expression_list ';')"); $$ = StmtNode::Echo($2); }
+          | RETURN expression ';'           { Console::ParserLog("statement (RETURN expression ';')"); $$ = StmtNode::ReturnStmt($2); }
+          | RETURN ';'                      { Console::ParserLog("statement (RETURN ';')"); $$ = StmtNode::ReturnStmt(); }
+          | BREAK ';'                       { Console::ParserLog("statement (BREAK ';')"); $$ = StmtNode::BreakStmt(); }
+          | CONTINUE ';'                    { Console::ParserLog("statement (CONTINUE ';')"); $$ = StmtNode::ContinueStmt(); }
+          | ';'                             { Console::ParserLog("statement (';')"); $$ = nullptr; }
           ;
 
 statement_list : statement                  { Console::ParserLog("statement_list (statement)"); $$ = StmtNode::StmtList($1); }
@@ -242,8 +238,8 @@ statement_list_empty : %empty           { Console::ParserLog("statement_list_emp
 
 
 while_statement : WHILE '(' expression ')' statement                        { Console::ParserLog("while_statement (WHILE '(' expression ')' statement)"); $$ = StmtNode::While($3, $5); }
-                | WHILE '(' expression ')' ':' statement_list ENDWHILE stmt_end  { Console::ParserLog("while_statement (WHILE '(' expression ')' ':' statement_list ENDWHILE stmt_end)"); $$ = StmtNode::While($3, $6); }
-                | DO statement WHILE '(' expression ')' stmt_end                 { Console::ParserLog("while_statement (DO statement WHILE '(' expression ')' stmt_end)"); $$ = StmtNode::DoWhile($5, $2); }
+                | WHILE '(' expression ')' ':' statement_list ENDWHILE ';'  { Console::ParserLog("while_statement (WHILE '(' expression ')' ':' statement_list ENDWHILE ';')"); $$ = StmtNode::While($3, $6); }
+                | DO statement WHILE '(' expression ')' ';'                 { Console::ParserLog("while_statement (DO statement WHILE '(' expression ')' ';')"); $$ = StmtNode::DoWhile($5, $2); }
                 ;
 
 for_statement : FOR '(' expression_list_empty ';' expression_list_empty ';' expression_list_empty ')' statement                     { Console::ParserLog("for_statement (FOR '(' expression_list_empty ';' expression_list_empty ';' expression_list_empty ')' statement)"); $$ = StmtNode::For($3, $5, $7, $9); }
@@ -252,14 +248,14 @@ for_statement : FOR '(' expression_list_empty ';' expression_list_empty ';' expr
 
 foreach_statement : FOREACH '(' expression AS '$' ID KEY_ACCESS '$' ID ')' statement                            { Console::ParserLog("foreach_statement (FOREACH '(' expression AS '$' ID KEY_ACCESS '$' ID ')' statement)"); $$ = StmtNode::ForEachKeyValue($3, ExprNode::Id($6), ExprNode::Id($9), $11); }
                   | FOREACH '(' expression AS '$' ID ')' statement                                              { Console::ParserLog("foreach_statement (FOREACH '(' expression AS '$' ID ')' statement)"); $$ = StmtNode::ForEachSimple($3, ExprNode::Id($6), $8); }
-                  | FOREACH '(' expression AS '$' ID KEY_ACCESS '$' ID ')' ':' statement_list ENDFOREACH stmt_end    { Console::ParserLog("foreach_statement (FOREACH '(' expression AS '$' ID KEY_ACCESS '$' ID ')' ':' statement_list ENDFOREACH stmt_end)"); $$ = StmtNode::ForEachKeyValue($3, ExprNode::Id($6), ExprNode::Id($9), $12); }
-                  | FOREACH '(' expression AS '$' ID ')' ':' statement_list ENDFOREACH stmt_end                      { Console::ParserLog("foreach_statement (FOREACH '(' expression AS '$' ID ')' ':' statement_list ENDFOREACH stmt_end)"); $$ = StmtNode::ForEachSimple($3, ExprNode::Id($6), $9); }
+                  | FOREACH '(' expression AS '$' ID KEY_ACCESS '$' ID ')' ':' statement_list ENDFOREACH ';'    { Console::ParserLog("foreach_statement (FOREACH '(' expression AS '$' ID KEY_ACCESS '$' ID ')' ':' statement_list ENDFOREACH ';')"); $$ = StmtNode::ForEachKeyValue($3, ExprNode::Id($6), ExprNode::Id($9), $12); }
+                  | FOREACH '(' expression AS '$' ID ')' ':' statement_list ENDFOREACH ';'                      { Console::ParserLog("foreach_statement (FOREACH '(' expression AS '$' ID ')' ':' statement_list ENDFOREACH ';')"); $$ = StmtNode::ForEachSimple($3, ExprNode::Id($6), $9); }
                   ;
 
 if_statement : IF '(' expression ')' statement else_statement_empty_1                                           { Console::ParserLog("if_statement (IF '(' expression ')' statement else_statement_empty_1)"); $$ = StmtNode::If_Else($3, $5, $6); }
              | IF '(' expression ')' statement elseif_statements_1 else_statement_empty_1                       { Console::ParserLog("if_statement (IF '(' expression ')' statement elseif_statements_1 else_statement_empty_1)"); $$ = StmtNode::If_ElifElse($3, $5, $6, $7); }
-             | IF '(' expression ')' ':' statement_list else_statement_empty_2 ENDIF stmt_end                        { Console::ParserLog("if_statement (IF '(' expression ')' ':' statement_list else_statement_empty_2 ENDIF stmt_end)"); $$ = StmtNode::If_Else($3, $6, $7); }
-             | IF '(' expression ')' ':' statement_list elseif_statements_2 else_statement_empty_2 ENDIF stmt_end    { Console::ParserLog("if_statement (IF '(' expression ')' ':' statement_list elseif_statements_2 else_statement_empty_2 ENDIF stmt_end)"); $$ = StmtNode::If_ElifElse($3, $6, $7, $8); }
+             | IF '(' expression ')' ':' statement_list else_statement_empty_2 ENDIF ';'                        { Console::ParserLog("if_statement (IF '(' expression ')' ':' statement_list else_statement_empty_2 ENDIF ';')"); $$ = StmtNode::If_Else($3, $6, $7); }
+             | IF '(' expression ')' ':' statement_list elseif_statements_2 else_statement_empty_2 ENDIF ';'    { Console::ParserLog("if_statement (IF '(' expression ')' ':' statement_list elseif_statements_2 else_statement_empty_2 ENDIF ';')"); $$ = StmtNode::If_ElifElse($3, $6, $7, $8); }
              ;
 
 else_statement_empty_1 : %empty         { Console::ParserLog("else_statement_empty_1 (empty)"); $$ = nullptr; }
@@ -285,7 +281,7 @@ elseif_statement_2 : ELSEIF '(' expression ')' ':' statement_list   { Console::P
                 ;
 
 switch_statement : SWITCH '(' expression ')' '{' case_statements_empty '}'          { Console::ParserLog("switch_statement (SWITCH '(' expression ')' '{' case_statements_empty '}')"); $$ = StmtNode::Switch($3, $6); }
-              | SWITCH '(' expression ')' ':' case_statements_empty ENDSWITCH stmt_end   { Console::ParserLog("switch_statement (SWITCH '(' expression ')' ':' case_statements_empty ENDSWITCH stmt_end)"); $$ = StmtNode::Switch($3, $6); }
+              | SWITCH '(' expression ')' ':' case_statements_empty ENDSWITCH ';'   { Console::ParserLog("switch_statement (SWITCH '(' expression ')' ':' case_statements_empty ENDSWITCH ';')"); $$ = StmtNode::Switch($3, $6); }
               ;
 
 case_statements_empty : %empty          { Console::ParserLog("case_statements_empty (empty)"); $$ = nullptr; }

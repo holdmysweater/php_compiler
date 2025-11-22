@@ -183,7 +183,7 @@ VAR         [Vv][Aa][Rr]
                                     html->reset();
                                     html->setStartLine(yylineno);
 
-                                    return END_TAG;
+                                    return ';';
                                 }
 <PURE_PHP,ECHO_PHP><<EOF>>		{
                                     Console::LexLog(yylineno, yytext, "end of file - closing php tag");
