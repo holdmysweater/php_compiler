@@ -127,19 +127,19 @@ VAR         [Vv][Aa][Rr]
                 return FLOAT;
 
             case Token::Type::TOKEN_STRING:
-                yylval.string_const = &token.value_string;
+                yylval.string_const = new std::string(token.value_string);
                 return STRING;
 
             case Token::Type::TOKEN_IDENTIFIER:
-                yylval.string_const = &token.value_string;
+                yylval.string_const = new std::string(token.value_string);
                 return ID;
 
             case Token::Type::TOKEN_TYPE:
-                yylval.string_const = &token.value_string;
+                yylval.string_const = new std::string(token.value_string);
                 return TYPE;
 
             case Token::Type::TOKEN_HTML:
-                yylval.string_const = &token.value_string;
+                yylval.string_const = new std::string(token.value_string);
                 return HTML_CONTENT;
 
             case Token::Type::TOKEN:
