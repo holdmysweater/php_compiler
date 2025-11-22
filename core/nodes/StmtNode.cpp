@@ -181,7 +181,7 @@ StmtNode *StmtNode::StmtList(StmtNode *stmt) {
     if (stmt != nullptr) {
         node->children.push_back(stmt);
     }
-    node->WriteToJsonFile();
+    node->WriteToFiles();
     return node;
 }
 
@@ -189,7 +189,7 @@ StmtNode *StmtNode::AppendToStmtList(StmtNode *stmtList, StmtNode *newStmt) {
     if (newStmt != nullptr) {
         stmtList->children.push_back(newStmt);
     }
-    stmtList->WriteToJsonFile();
+    stmtList->WriteToFiles();
     return stmtList;
 }
 
@@ -197,7 +197,7 @@ StmtNode *StmtNode::ExprStmt(ExprNode *expr) {
     auto node = new StmtNode();
     node->type = ST_EXPRESSION;
     node->expr = expr;
-    node->WriteToJsonFile();
+    node->WriteToFiles();
     return node;
 }
 
@@ -206,7 +206,7 @@ StmtNode *StmtNode::While(ExprNode *condition, StmtNode *stmt) {
     node->type = ST_WHILE;
     node->condition = condition;
     node->stmt = stmt;
-    node->WriteToJsonFile();
+    node->WriteToFiles();
     return node;
 }
 
@@ -215,7 +215,7 @@ StmtNode *StmtNode::DoWhile(ExprNode *condition, StmtNode *stmt) {
     node->type = ST_DO_WHILE;
     node->condition = condition;
     node->stmt = stmt;
-    node->WriteToJsonFile();
+    node->WriteToFiles();
     return node;
 }
 
@@ -226,7 +226,7 @@ StmtNode *StmtNode::For(ExprNode *initializer, ExprNode *condition, ExprNode *en
     node->condition = condition;
     node->loopEndAction = endAction;
     node->stmt = stmt;
-    node->WriteToJsonFile();
+    node->WriteToFiles();
     return node;
 }
 
@@ -236,7 +236,7 @@ StmtNode *StmtNode::ForEachSimple(ExprNode *collection, ExprNode *value, StmtNod
     node->foreachCollection = collection;
     node->foreachValue = value;
     node->stmt = stmt;
-    node->WriteToJsonFile();
+    node->WriteToFiles();
     return node;
 }
 
@@ -247,7 +247,7 @@ StmtNode *StmtNode::ForEachKeyValue(ExprNode *collection, ExprNode *key, ExprNod
     node->foreachKey = key;
     node->foreachValue = value;
     node->stmt = stmt;
-    node->WriteToJsonFile();
+    node->WriteToFiles();
     return node;
 }
 
@@ -256,7 +256,7 @@ StmtNode *StmtNode::If(ExprNode *condition, StmtNode *stmt) {
     node->type = ST_IF;
     node->condition = condition;
     node->stmt = stmt;
-    node->WriteToJsonFile();
+    node->WriteToFiles();
     return node;
 }
 
@@ -267,7 +267,7 @@ StmtNode *StmtNode::If_ElifElse(ExprNode *condition, StmtNode *stmt, StmtNode *e
     node->stmt = stmt;
     node->elseIfStmt = elseIfStmt;
     node->elseStmt = elseStmt;
-    node->WriteToJsonFile();
+    node->WriteToFiles();
     return node;
 }
 
@@ -277,7 +277,7 @@ StmtNode *StmtNode::If_Elif(ExprNode *condition, StmtNode *stmt, StmtNode *elseI
     node->condition = condition;
     node->stmt = stmt;
     node->elseIfStmt = elseIfStmt;
-    node->WriteToJsonFile();
+    node->WriteToFiles();
     return node;
 }
 
@@ -287,7 +287,7 @@ StmtNode *StmtNode::If_Else(ExprNode *condition, StmtNode *stmt, StmtNode *elseS
     node->condition = condition;
     node->stmt = stmt;
     node->elseStmt = elseStmt;
-    node->WriteToJsonFile();
+    node->WriteToFiles();
     return node;
 }
 
@@ -296,7 +296,7 @@ StmtNode *StmtNode::ElseIf(ExprNode *condition, StmtNode *stmt) {
     node->type = ST_ELSE_IF;
     node->condition = condition;
     node->stmt = stmt;
-    node->WriteToJsonFile();
+    node->WriteToFiles();
     return node;
 }
 
@@ -304,7 +304,7 @@ StmtNode *StmtNode::Else(StmtNode *stmt) {
     auto node = new StmtNode();
     node->type = ST_ELSE;
     node->stmt = stmt;
-    node->WriteToJsonFile();
+    node->WriteToFiles();
     return node;
 }
 
@@ -313,7 +313,7 @@ StmtNode *StmtNode::Switch(ExprNode *expr, StmtNode *stmt) {
     node->type = ST_SWITCH;
     node->expr = expr;
     node->stmt = stmt;
-    node->WriteToJsonFile();
+    node->WriteToFiles();
     return node;
 }
 
@@ -322,7 +322,7 @@ StmtNode *StmtNode::Case(ExprNode *expr, StmtNode *stmt) {
     node->type = ST_CASE;
     node->expr = expr;
     node->stmt = stmt;
-    node->WriteToJsonFile();
+    node->WriteToFiles();
     return node;
 }
 
@@ -330,7 +330,7 @@ StmtNode *StmtNode::CaseDefault(StmtNode *stmt) {
     auto node = new StmtNode();
     node->type = ST_CASE_DEFAULT;
     node->stmt = stmt;
-    node->WriteToJsonFile();
+    node->WriteToFiles();
     return node;
 }
 
@@ -338,14 +338,14 @@ StmtNode *StmtNode::Echo(ExprNode *expr) {
     auto node = new StmtNode();
     node->type = ST_ECHO;
     node->expr = expr;
-    node->WriteToJsonFile();
+    node->WriteToFiles();
     return node;
 }
 
 StmtNode *StmtNode::ReturnStmt() {
     auto node = new StmtNode();
     node->type = ST_RETURN;
-    node->WriteToJsonFile();
+    node->WriteToFiles();
     return node;
 }
 
@@ -353,20 +353,20 @@ StmtNode *StmtNode::ReturnStmt(ExprNode *expr) {
     auto node = new StmtNode();
     node->type = ST_RETURN;
     node->expr = expr;
-    node->WriteToJsonFile();
+    node->WriteToFiles();
     return node;
 }
 
 StmtNode *StmtNode::BreakStmt() {
     auto node = new StmtNode();
     node->type = ST_BREAK;
-    node->WriteToJsonFile();
+    node->WriteToFiles();
     return node;
 }
 
 StmtNode *StmtNode::ContinueStmt() {
     auto node = new StmtNode();
     node->type = ST_CONTINUE;
-    node->WriteToJsonFile();
+    node->WriteToFiles();
     return node;
 }

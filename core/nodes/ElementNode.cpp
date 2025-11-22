@@ -102,7 +102,7 @@ string ElementNode::toDot() const {
 ElementNode *ElementNode::EmptyElement() {
     auto node = new ElementNode();
     node->type = ElementType::ELEMENT_PROGRAM_LIST;
-    node->WriteToJsonFile();
+    node->WriteToFiles();
     return node;
 }
 
@@ -112,7 +112,7 @@ ElementNode *ElementNode::ElementList(ElementNode *element, ElementType type) {
     if (element != nullptr) {
         node->children.push_back(element);
     }
-    node->WriteToJsonFile();
+    node->WriteToFiles();
     return node;
 }
 
@@ -120,7 +120,7 @@ ElementNode *ElementNode::AppendToElementList(ElementNode *elementList, ElementN
     if (newElement != nullptr) {
         elementList->children.push_back(newElement);
     }
-    elementList->WriteToJsonFile();
+    elementList->WriteToFiles();
     return elementList;
 }
 
@@ -128,7 +128,7 @@ ElementNode *ElementNode::PhpDecl(DeclNode *declList) {
     auto node = new ElementNode();
     node->type = ElementType::ELEMENT_STATEMENT;
     node->decl = declList;
-    node->WriteToJsonFile();
+    node->WriteToFiles();
     return node;
 }
 
@@ -139,7 +139,7 @@ ElementNode *ElementNode::PhpStmt(StmtNode *stmt) {
     auto node = new ElementNode();
     node->type = ElementType::ELEMENT_STATEMENT;
     node->stmt = stmt;
-    node->WriteToJsonFile();
+    node->WriteToFiles();
     return node;
 }
 
@@ -147,7 +147,7 @@ ElementNode *ElementNode::PhpEchoContent(ExprNode *expr) {
     auto node = new ElementNode();
     node->type = ElementType::ELEMENT_ECHO_PHP;
     node->expr = expr;
-    node->WriteToJsonFile();
+    node->WriteToFiles();
     return node;
 }
 
@@ -155,6 +155,6 @@ ElementNode *ElementNode::HtmlContent(string *content) {
     auto node = new ElementNode();
     node->type = ElementType::ELEMENT_HTML;
     node->content = *content;
-    node->WriteToJsonFile();
+    node->WriteToFiles();
     return node;
 }

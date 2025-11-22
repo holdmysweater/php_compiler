@@ -11,7 +11,7 @@ uint32_t BaseNode::maxId = 0;
 
 uint32_t BaseNode::GetId() const { return id; }
 
-void BaseNode::WriteToJsonFile() const {
+void BaseNode::WriteToFiles() const {
     Console::Log(Color::Grey() + "%NODE% Updating '" + std::to_string(this->GetId()) + "'");
     try {
         OutputManager::OutputJson(this->toJson(), std::to_string(this->GetId()));

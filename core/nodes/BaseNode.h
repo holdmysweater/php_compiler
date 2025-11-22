@@ -21,7 +21,7 @@ public:
 
     uint32_t GetId() const;
 
-    void WriteToJsonFile() const;
+    void WriteToFiles() const;
 
     virtual string toJson() const = 0;
 
