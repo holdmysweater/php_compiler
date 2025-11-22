@@ -48,6 +48,10 @@ string DeclNode::toJson() const {
         j["declList"] = json::parse(declList->toJson());
     }
 
+    if (params != nullptr) {
+        j["params"] = json::parse(params->toJson());
+    }
+
     if (expr != nullptr) {
         j["expr"] = json::parse(expr->toJson());
     }
@@ -118,10 +122,17 @@ string DeclNode::toDot() const {
         result += declList->toDot();
     }
 
+    if (params != nullptr) {
+        result += " node" + std::to_string(GetId()) + " -> node" + std::to_string(params->GetId()) +
+                " [label=params];\n";
+        result += params->toDot();
+    }
+
     if (expr != nullptr) {
         result += " node" + std::to_string(GetId()) + " -> node" + std::to_string(expr->GetId()) + " [label=expr];\n";
         result += expr->toDot();
     }
+
     if (stmt != nullptr) {
         result += " node" + std::to_string(GetId()) + " -> node" + std::to_string(stmt->GetId()) + " [label=stmt];\n";
         result += stmt->toDot();
@@ -167,9 +178,13 @@ bool DeclNode::doSemantics() {
             break;
         case DT_FUNCTION:
         case DT_METHOD:
+            // Function names are case-insensitive
             for (char &c: name) {
                 c = tolower(static_cast<unsigned char>(c));
             }
+
+            // Semantics for parameters
+            isOk = this->params->doSemantics();
             Warn("DT_FUNCTION/DT_METHOD not implemented");
             break;
         default:
@@ -304,7 +319,7 @@ DeclNode *DeclNode::FunctionDecl(string *name, DeclNode *params) {
     auto node = new DeclNode();
     node->type = DT_FUNCTION;
     node->name = *name;
-    node->declList = params;
+    node->params = params;
     node->WriteToFiles();
     return node;
 }
@@ -313,7 +328,7 @@ DeclNode *DeclNode::FunctionDecl(string *name, DeclNode *params, ValueNode *type
     auto node = new DeclNode();
     node->type = DT_FUNCTION;
     node->name = *name;
-    node->declList = params;
+    node->params = params;
     node->valueType = type;
     node->WriteToFiles();
     return node;

@@ -1,7 +1,7 @@
 <?php
 $var = "test";
 
-function typedFunction(string|SimpleClass $param): string|int|null
+function typedFunction(string|SimpleClass $param, int $anotherParam): string|int|null
 {
     $something = "string content";
 

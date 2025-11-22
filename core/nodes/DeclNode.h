@@ -32,6 +32,8 @@ public:
     int isStatic = -1;
     VisibilityType visibilityType = VisibilityType::VISIBILITY_UNKNOWN;
 
+    DeclNode *params = nullptr;
+
     string _getClassName() const override;
 
     string toJson() const override;
