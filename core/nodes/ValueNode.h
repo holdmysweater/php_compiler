@@ -29,7 +29,7 @@ public:
 
     string toDot() const override;
 
-    bool doSemantics() const override;
+    bool doSemantics() override;
 
     // List methods
     static ValueNode *ValueList(ValueNode *value);

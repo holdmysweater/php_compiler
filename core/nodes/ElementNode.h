@@ -19,7 +19,7 @@ public:
 
     string toDot() const override;
 
-    bool doSemantics() const override;
+    bool doSemantics() override;
 
     // List
     static ElementNode *EmptyElement();

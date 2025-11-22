@@ -1,7 +1,8 @@
 <?php
 $var = "test";
 
-function typedFunction(string | SimpleClass $param): string | int | null {
+function typedFunction(string|SimpleClass $param): string|int|null
+{
     $something = "string content";
 
     if ($something == "string") {
@@ -11,7 +12,13 @@ function typedFunction(string | SimpleClass $param): string | int | null {
     return "Number: " . $param;
 }
 
-class SimpleClass {}
+class SimpleClass
+{
+    function simpleFunc(): string|int|null
+    {
+        return null;
+    }
+}
 
 $result = typedFunction("hi")
 ?>

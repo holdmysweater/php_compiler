@@ -35,7 +35,7 @@ public:
 
     virtual string toDot() const = 0;
 
-    virtual bool doSemantics() const = 0;
+    virtual bool doSemantics() = 0;
 };
 
 #endif //PHP_COMPILER_BASENODE_H

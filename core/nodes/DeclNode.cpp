@@ -1,6 +1,9 @@
 #include "DeclNode.h"
 #include "core/helpers/Console.h"
 #include "json.hpp"
+#include <string>
+#include <algorithm>
+#include <cctype>
 
 using json = nlohmann::json;
 
@@ -133,7 +136,7 @@ string DeclNode::toDot() const {
     return result;
 }
 
-bool DeclNode::doSemantics() const {
+bool DeclNode::doSemantics() {
     Log("starting semantics for " + toString(type) + "...");
 
     bool isOk = true;
@@ -147,7 +150,8 @@ bool DeclNode::doSemantics() const {
             }
             break;
         case DT_CLASS:
-            Warn("DT_CLASS not implemented");
+            isOk = this->declList->doSemantics();
+            Warn("DT_CLASS implementation is unfinished");
             break;
         case DT_VARIABLE:
             Warn("DT_VARIABLE not implemented");
@@ -162,10 +166,11 @@ bool DeclNode::doSemantics() const {
             Warn("DT_CONSTANT not implemented");
             break;
         case DT_FUNCTION:
-            Warn("DT_FUNCTION not implemented");
-            break;
         case DT_METHOD:
-            Warn("DT_METHOD not implemented");
+            for (char &c: name) {
+                c = tolower(static_cast<unsigned char>(c));
+            }
+            Warn("DT_FUNCTION/DT_METHOD not implemented");
             break;
         default:
             Error("unknown enum type");

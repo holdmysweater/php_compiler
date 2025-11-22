@@ -179,7 +179,7 @@ string StmtNode::toDot() const {
     return result;
 }
 
-bool StmtNode::doSemantics() const {
+bool StmtNode::doSemantics() {
     Console::Warning("StmtNode::doSemantics is empty");
     return true;
 }

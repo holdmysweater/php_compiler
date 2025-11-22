@@ -86,7 +86,7 @@ string ElementNode::toDot() const {
     return result;
 }
 
-bool ElementNode::doSemantics() const {
+bool ElementNode::doSemantics() {
     Log("starting semantics for " + toString(type) + "...");
 
     bool isOk = true;
