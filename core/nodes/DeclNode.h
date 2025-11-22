@@ -49,7 +49,11 @@ public:
 
     static DeclNode *SetModsToDecl(DeclNode *decl, RawDeclModifier *modifier);
 
+    static DeclNode *SetModsToDecl(DeclNode *decl, RawDeclModifier *modifier, ValueNode *type);
+
     static DeclNode *SetTypeToDecl(DeclNode *decl, DeclType type);
+
+    static DeclNode *SetValueTypeToDecl(DeclNode *decl, ValueNode *type);
 
     // Declarations
     static DeclNode *ClassDecl(string *className, DeclNode *declList);

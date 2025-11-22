@@ -160,19 +160,35 @@ bool DeclNode::doSemantics() {
             }
             break;
         case DT_CLASS:
-            isOk = this->declList->doSemantics();
+            // Class names are case-insensitive
+            for (char &c: name) {
+                c = tolower(static_cast<unsigned char>(c));
+            }
+
+            // Semantics for declarations of the class
+            if (this->declList != nullptr) {
+                isOk = isOk && this->declList->doSemantics();
+            } else {
+                Log("skipped decl list");
+            }
+
+            // TODO maybe check if the function names / var names are the same?
             Warn("DT_CLASS implementation is unfinished");
             break;
         case DT_VARIABLE:
+            // TODO var logic
             Warn("DT_VARIABLE not implemented");
             break;
         case DT_PROPERTY:
+            // TODO property logic
             Warn("DT_PROPERTY not implemented");
             break;
         case DT_PARAMETER:
+            // TODO parameter logic
             Warn("DT_PROPERTY not implemented");
             break;
         case DT_CONSTANT:
+            // TODO const logic
             Warn("DT_CONSTANT not implemented");
             break;
         case DT_FUNCTION:
@@ -241,8 +257,36 @@ DeclNode *DeclNode::SetModsToDecl(DeclNode *decl, RawDeclModifier *modifier) {
     return decl;
 }
 
+DeclNode *DeclNode::SetModsToDecl(DeclNode *decl, RawDeclModifier *modifier, ValueNode *type) {
+    if (decl->type == DeclType::DT_LIST) {
+        for (DeclNode *child: decl->children) {
+            child->visibilityType = modifier->visibility;
+            child->isStatic = modifier->isStatic;
+            child->valueType = type;
+        }
+    } else {
+        decl->visibilityType = modifier->visibility;
+        decl->isStatic = modifier->isStatic;
+        decl->valueType = type;
+    }
+    decl->WriteToFiles();
+    return decl;
+}
+
 DeclNode *DeclNode::SetTypeToDecl(DeclNode *decl, DeclType type) {
     decl->type = type;
+    return decl;
+}
+
+DeclNode *DeclNode::SetValueTypeToDecl(DeclNode *decl, ValueNode *type) {
+    if (decl->type == DeclType::DT_LIST) {
+        for (DeclNode *child: decl->children) {
+            child->valueType = type;
+        }
+    } else {
+        decl->valueType = type;
+    }
+    decl->WriteToFiles();
     return decl;
 }
 

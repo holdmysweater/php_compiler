@@ -366,7 +366,9 @@ declaration_modifiers : visibility_modifiers        { Console::ParserLog("declar
                       ;
 
 property_declaration : VAR property_elements ';'                { Console::ParserLog("property_declaration (VAR property_elements ';')"); $$ = $2; }
+                 | VAR type_list property_elements ';'          { Console::ParserLog("property_declaration (VAR type_list property_elements ';')"); $$ = DeclNode::SetValueTypeToDecl($3, $2); }
                  | declaration_modifiers property_elements ';'  { Console::ParserLog("property_declaration (declaration_modifiers property_elements ';')"); $$ = DeclNode::SetModsToDecl($2, $1); }
+                 | declaration_modifiers type_list property_elements ';'  { Console::ParserLog("property_declaration (declaration_modifiers type_list property_elements ';')"); $$ = DeclNode::SetModsToDecl($3, $1, $2); }
                  ;
 
 property_elements : property_element                    { Console::ParserLog("property_elements (property_element)"); $$ = DeclNode::DeclList($1); }

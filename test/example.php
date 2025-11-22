@@ -1,30 +1,33 @@
 <?php
-function typedFunction(string|SimpleClass $param, int $anotherParam): string|int|null
-{
-    $something = "string content";
-
-    if ($something == "string") {
-        return "string";
-    }
-
-    return "Number: " . $param;
-}
+//function typedFunction(string|SimpleClass $param, int $anotherParam): string|int|null
+//{
+//    $something = "string content";
+//
+//    if ($something == "string") {
+//        return "string";
+//    }
+//
+//    return "Number: " . $param;
+//}
 
 class SimpleClass
 {
-    function simpleFunc(): string|int|null
-    {
-        return null;
-    }
+    var string|null $var = "hi";
+    private static string|null $_var = "bye";
 
-    static function simpleFunc2(void|int $hi): void
-    {
-    }
+//    private function simpleFunc(): string|int|null
+//    {
+//        return null;
+//    }
+//
+//    static function simpleFunc2(int $hi): void
+//    {
+//    }
 
 //    static function simpleFunc3(): string
 //    {
 //    }
 }
 
-echo SimpleClass::simpleFunc2()
+//echo SimpleClass::simpleFunc2()
 ?>
