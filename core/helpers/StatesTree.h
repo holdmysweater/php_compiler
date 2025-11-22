@@ -1,7 +1,7 @@
-#ifndef PHP_COMPILER_STATE_H
-#define PHP_COMPILER_STATE_H
+#ifndef PHP_COMPILER_STATESTREE_H
+#define PHP_COMPILER_STATESTREE_H
 
-#define CONSOLE_STATE_LOG_ENABLED
+#include "../macros.h"
 
 #include <string>
 #include <vector>
@@ -26,4 +26,4 @@ public:
     string getStateTree();
 };
 
-#endif //PHP_COMPILER_STATE_H
+#endif //PHP_COMPILER_STATESTREE_H

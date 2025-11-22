@@ -11,7 +11,7 @@ uint32_t BaseNode::maxId = 0;
 uint32_t BaseNode::GetId() const { return id; }
 
 void BaseNode::WriteToFiles() const {
-#ifdef BASENODE_FILE_DEBUG
+#ifdef NODE_FILE_GENERATION_DEBUG
     try {
         Log("updating debug files");
         OutputManager::OutputJson(this->toJson(), std::to_string(this->GetId()));

@@ -36,13 +36,13 @@ string ElementNode::toDot() const {
     string result;
     string label;
 
-#ifdef BASENODE_DOT_DEBUG
+#ifdef NODE_DOT_LABEL_DEBUG
     label += "(P) ";
 #endif
 
     label += toSymbol(type);
 
-#ifdef BASENODE_DOT_DEBUG
+#ifdef NODE_DOT_LABEL_DEBUG
     label += "\\n" + toString(type);
     label += "\\nID: " + std::to_string(GetId());
 #endif
@@ -98,8 +98,8 @@ bool ElementNode::doSemantics() const {
             return true;
         case ELEMENT_PROGRAM_LIST:
             Log("starting semantics for children of ELEMENT_PROGRAM_LIST...");
-             for (const auto &child: children) {
-                isOk &= child->doSemantics();
+            for (const auto &child: children) {
+                isOk = isOk && child->doSemantics();
             }
 
             if (isOk) {
@@ -117,7 +117,7 @@ bool ElementNode::doSemantics() const {
             return true;
         case ELEMENT_FUNC_DECL:
             Warn("function decl");
-            return false;
+            return true;
         default:
             Error("unknown enum type");
             return false;

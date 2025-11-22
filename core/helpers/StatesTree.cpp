@@ -7,7 +7,7 @@
 int StatesTree::pushAndPeek(int state) {
     _states.push_back(state);
 
-#ifdef CONSOLE_STATE_LOG_ENABLED
+#ifdef CONSOLE_STATESTREE_LOG_ENABLED
     Console::Log(Color::Magenta() + "S = " + StatesTree::getStateTree());
 #endif
 
@@ -18,7 +18,7 @@ int StatesTree::popAndPeek() {
     int prev = _states.back();
     _states.pop_back();
 
-#ifdef CONSOLE_STATE_LOG_ENABLED
+#ifdef CONSOLE_STATESTREE_LOG_ENABLED
     Console::Log(
         Color::Magenta() + "S = " + StatesTree::getStateTree() + " (was " + StatesTree::StateCodeToString(prev) + ")");
 #endif

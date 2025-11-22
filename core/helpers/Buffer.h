@@ -1,8 +1,7 @@
 #ifndef PHP_COMPILER_BUFFER_H
 #define PHP_COMPILER_BUFFER_H
 
-// #define CONSOLE_BUFFER_LOG_ENABLED
-
+#include "../macros.h"
 #include "IndentTracker.h"
 
 #include <string>

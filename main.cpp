@@ -18,6 +18,7 @@ ElementNode *root;
 
 int main(int argc, char *argv[]) {
     Console::SystemTitle("PHP TRANSLATOR");
+    Console::ShowSettings();
 
     if (argc < 4) {
         Console::SystemError(

@@ -1,7 +1,7 @@
 #ifndef PHP_COMPILER_TOKENQUEUE_H
 #define PHP_COMPILER_TOKENQUEUE_H
 
-// #define CONSOLE_TOKENQUEUE_LOG_ENABLED
+#include "../macros.h"
 
 #include "Token.h"
 

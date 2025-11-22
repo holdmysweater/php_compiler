@@ -56,13 +56,13 @@ string ValueNode::toDot() const {
     string result;
     string label;
 
-#ifdef BASENODE_DOT_DEBUG
+#ifdef NODE_DOT_LABEL_DEBUG
     label += "(V) ";
 #endif
 
     label += toSymbol(type);
 
-#ifdef BASENODE_DOT_DEBUG
+#ifdef NODE_DOT_LABEL_DEBUG
     label += "\\nID: " + std::to_string(GetId());
 #endif
 

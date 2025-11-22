@@ -1,8 +1,7 @@
 #ifndef PHP_COMPILER_BASENODE_H
 #define PHP_COMPILER_BASENODE_H
 
-// #define BASENODE_FILE_DEBUG
-#define BASENODE_DOT_DEBUG
+#include "../macros.h"
 
 #include <cstdint>
 #include <string>

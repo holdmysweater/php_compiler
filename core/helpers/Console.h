@@ -1,7 +1,7 @@
 #ifndef PHP_COMPILER_CONSOLE_H
 #define PHP_COMPILER_CONSOLE_H
 
-#define CONSOLE_LOG_ENABLED
+#include "../macros.h"
 
 #include <iostream>
 #include <cstdint>
@@ -10,6 +10,8 @@ using std::string;
 
 class Console {
 public:
+    static void ShowSettings();
+
     static void SystemTitle(string title);
 
     static void Log(string message);
