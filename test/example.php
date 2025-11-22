@@ -1,8 +1,4 @@
 <?php
-$array = "hi";
+$result = [...[1,2,3], 4, 5];
+print_r($result);
 
-$array = array("hi" => 1, 2, 3);
-
-"hello {$array[2]} sdfsdf";
-
-echo $array["hi"];

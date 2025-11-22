@@ -609,6 +609,7 @@ VAR         [Vv][Aa][Rr]
 <PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"<<="  	{ Console::LexLog(yylineno, yytext, "operator '<<='"); return LEFT_SHIFT_ASSIGN; }
 <PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>">>="  	{ Console::LexLog(yylineno, yytext, "operator '>>='"); return RIGHT_SHIFT_ASSIGN; }
 
+<PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"..." 	{ Console::LexLog(yylineno, yytext, "operator '...'"); return SPREAD_OPERATOR; }
 <PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"===" 	{ Console::LexLog(yylineno, yytext, "operator '==='"); return IDENTICALLY_EQUAL; }
 <PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"!==" 	{ Console::LexLog(yylineno, yytext, "operator '!=='"); return IDENTICALLY_NOT_EQUAL; }
 <PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"::"  	{ Console::LexLog(yylineno, yytext, "operator '::'"); return STATIC_PROPERTY_ACCESS; }

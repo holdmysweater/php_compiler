@@ -83,6 +83,7 @@
 %token INTERPOLATION_END
 %token KEY_ACCESS
 %token ARRAY
+%token SPREAD_OPERATOR
 
 %left OR
 %left AND
@@ -205,6 +206,7 @@ array_element_list : array_element                          { Console::ParserLog
 
 array_element : expression KEY_ACCESS expression    { Console::ParserLog("array_element (expression KEY_ACCESS expression)"); $$ = ExprNode::ArrayKeyAccess($1, $3); }
               | expression                          { Console::ParserLog("array_element (expression)"); $$ = $1; }
+              | SPREAD_OPERATOR expression          { Console::ParserLog("array_element (SPREAD_OPERATOR expression)"); $$ = ExprNode::SpreadArray($2); }
               ;
 
 expression_list : expression                        { Console::ParserLog("expression_list (expression)"); $$ = ExprNode::ExprList($1); }

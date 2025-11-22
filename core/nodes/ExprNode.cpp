@@ -495,6 +495,14 @@ ExprNode *ExprNode::Array() {
     return node;
 }
 
+ExprNode *ExprNode::SpreadArray(ExprNode *array) {
+    auto node = new ExprNode();
+    node->type = ExprType::ET_SPREAD_OPERATOR;
+    node->children.push_back(array);
+    node->WriteToJsonFile();
+    return node;
+}
+
 // Ternary operator
 ExprNode *ExprNode::Ternary(ExprNode *condition, ExprNode *trueExpr, ExprNode *falseExpr) {
     auto node = new ExprNode();
