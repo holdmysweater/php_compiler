@@ -20,6 +20,10 @@ enum StmtType {
     ST_CASE_DEFAULT,
     ST_ECHO,
     ST_RETURN,
+    ST_THROW,
+    ST_CATCH,
+    ST_FINALLY,
+    ST_TRY,
     ST_BREAK,
     ST_CONTINUE,
     ST_UNKNOWN
@@ -41,6 +45,10 @@ inline string toString(StmtType type) {
         case StmtType::ST_CASE_DEFAULT: return "ST_CASE_DEFAULT";
         case StmtType::ST_ECHO: return "ST_ECHO";
         case StmtType::ST_RETURN: return "ST_RETURN";
+        case StmtType::ST_THROW: return "ST_THROW";
+        case StmtType::ST_CATCH: return "ST_CATCH";
+        case StmtType::ST_FINALLY: return "ST_FINALLY";
+        case StmtType::ST_TRY: return "ST_TRY";
         case StmtType::ST_BREAK: return "ST_BREAK";
         case StmtType::ST_CONTINUE: return "ST_CONTINUE";
         case StmtType::ST_UNKNOWN: return "ST_UNKNOWN";
@@ -64,6 +72,10 @@ inline string toSymbol(StmtType type) {
         case StmtType::ST_CASE_DEFAULT: return "default case";
         case StmtType::ST_ECHO: return "echo";
         case StmtType::ST_RETURN: return "return";
+        case StmtType::ST_THROW: return "throw";
+        case StmtType::ST_CATCH: return "catch";
+        case StmtType::ST_FINALLY: return "finally";
+        case StmtType::ST_TRY: return "try";
         case StmtType::ST_BREAK: return "break";
         case StmtType::ST_CONTINUE: return "continue";
         case StmtType::ST_UNKNOWN: return "unknown";

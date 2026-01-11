@@ -1,18 +1,33 @@
 <?php
 
-function buildUser(array $input): array
+class InvalidAgeException extends Exception
 {
-    return array(
-        "id" => $input["id"],
-        "name" => $input["name"],
-        "active" => true
-    );
 }
 
-$userData = array(
-    "id" => 10,
-    "name" => "Alice"
-);
+function validateAge(int $age): void
+{
+    if ($age < 0) {
+        throw new InvalidAgeException("Age cannot be negative");
+    }
 
-$user = buildUser($userData);
-print_r($user);
+    if ($age < 18) {
+        throw new Exception("User is underaged");
+    }
+}
+
+try {
+    validateAge(15);
+    echo "Age is valid";
+} catch (InvalidAgeException $e) {
+    echo "InvalidAgeException: " . $e->getMessage();
+} catch (Exception $e) {
+    echo "Exception: " . $e->getMessage();
+}
+
+$try = 'f';
+
+try {
+    validateAge(123);
+} finally {
+    echo "hi";
+}

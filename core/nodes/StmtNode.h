@@ -30,6 +30,11 @@ public:
     StmtNode *elseIfStmt = nullptr;
     StmtNode *elseStmt = nullptr;
 
+    StmtNode *catchStmt = nullptr;
+    string catchId;
+    ValueNode *catchType = nullptr;
+    StmtNode *finallyStmt = nullptr;
+
     string _getClassName() const override;
 
     string toJson() const override;
@@ -79,6 +84,18 @@ public:
     static StmtNode *ReturnStmt();
 
     static StmtNode *ReturnStmt(ExprNode *expr);
+
+    static StmtNode *ThrowStmt(ExprNode *expr);
+
+    static StmtNode *CatchStmt(StmtNode *stmt, ValueNode *catchType, string *catchId);
+
+    static StmtNode *FinallyStmt(StmtNode *stmt);
+
+    static StmtNode *TryCatchStmt(StmtNode *stmt, StmtNode *catchStmt);
+
+    static StmtNode *TryFinallyStmt(StmtNode *stmt, StmtNode *finallyStmt);
+
+    static StmtNode *TryCatchFinallyStmt(StmtNode *stmt, StmtNode *catchStmt, StmtNode *finallyStmt);
 
     static StmtNode *BreakStmt();
 

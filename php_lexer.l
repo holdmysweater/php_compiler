@@ -64,6 +64,10 @@ INSTANCEOF  [Ii][Nn][Ss][Tt][Aa][Nn][Cc][Ee][Oo][Ff]
 RETURN      [Rr][Ee][Tt][Uu][Rr][Nn]
 STATIC      [Ss][Tt][Aa][Tt][Ii][Cc]
 VAR         [Vv][Aa][Rr]
+TRY         [Tt][Rr][Yy]
+CATCH       [Cc][Aa][Tt][Cc][Hh]
+THROW       [Tt][Hh][Rr][Oo][Ww]
+FINALLY     [Ff][Ii][Nn][Aa][Ll][Ll][Yy]
 
 %x PURE_PHP
 %x INTERPOLATED_PHP
@@ -523,6 +527,10 @@ VAR         [Vv][Aa][Rr]
 <PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>\${CASE}   { logSigilAndPushId(yytext+1, "CASE"); return '$'; }
 <PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>\${ECHO_KW}   { logSigilAndPushId(yytext+1, "ECHO_KW"); return '$'; }
 <PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>\${VAR}   { logSigilAndPushId(yytext+1, "VAR"); return '$'; }
+<PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>\${TRY}   { logSigilAndPushId(yytext+1, "TRY"); return '$'; }
+<PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>\${CATCH}   { logSigilAndPushId(yytext+1, "CATCH"); return '$'; }
+<PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>\${THROW}   { logSigilAndPushId(yytext+1, "THROW"); return '$'; }
+<PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>\${FINALLY}   { logSigilAndPushId(yytext+1, "FINALLY"); return '$'; }
 <PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>\${FOR}   { logSigilAndPushId(yytext+1, "FOR"); return '$'; }
 <PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>\${AS}   { logSigilAndPushId(yytext+1, "AS"); return '$'; }
 <PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>\${IF}   { logSigilAndPushId(yytext+1, "IF"); return '$'; }
@@ -574,6 +582,10 @@ VAR         [Vv][Aa][Rr]
 <PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>{ECHO_KW}      { Console::LexLog(yylineno, yytext, "keyword ECHO_KW"); return ECHO_KW; }
 
 <PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>{VAR}          { Console::LexLog(yylineno, yytext, "keyword VAR"); return VAR; }
+<PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>{TRY}          { Console::LexLog(yylineno, yytext, "keyword TRY"); return TRY; }
+<PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>{CATCH}        { Console::LexLog(yylineno, yytext, "keyword CATCH"); return CATCH; }
+<PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>{THROW}        { Console::LexLog(yylineno, yytext, "keyword THROW"); return THROW; }
+<PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>{FINALLY}      { Console::LexLog(yylineno, yytext, "keyword FINALLY"); return FINALLY; }
 <PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>{FOR}          { Console::LexLog(yylineno, yytext, "keyword FOR"); return FOR; }
 <PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>{AS}           { Console::LexLog(yylineno, yytext, "keyword AS"); return AS; }
 <PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>{IF}           { Console::LexLog(yylineno, yytext, "keyword IF"); return IF; }

@@ -32,9 +32,9 @@
 %type <char_const> error
 %type <elementNode> program php_program_list php_program_element
 %type <declNode> function_definition class_declaration function_definition_header parameter_function_list_empty parameter_function_list parameter_function class_member_declarations_empty class_member_declarations class_member_declaration class_const_elements property_declaration method_declaration const_elements const_element property_elements property_element
-%type <stmtNode> statement while_statement for_statement statement_list_empty foreach_statement if_statement switch_statement statement_list else_statement_empty_1 elseif_statements_1 else_statement_empty_2 elseif_statements_2 elseif_statement_1 elseif_statement_2 case_statements_empty case_statements case_statement
+%type <stmtNode> statement try_statement catch_list catch_clause finally_clause while_statement for_statement statement_list_empty foreach_statement if_statement switch_statement statement_list else_statement_empty_1 elseif_statements_1 else_statement_empty_2 elseif_statements_2 elseif_statement_1 elseif_statement_2 case_statements_empty case_statements case_statement
 %type <exprNode> expression array_element array_element_list expression_list expression_list_empty string interpolatable_elements interpolatable_element simple_interpolated_expression complex_interpolated_expression expression_variable
-%type <valueNode> type_list type
+%type <valueNode> type_list type id_list
 %type <modifier> visibility_modifiers declaration_modifiers
 
 %token ERROR
@@ -76,6 +76,10 @@
 %token KEY_ACCESS
 %token ARRAY
 %token SPREAD_OPERATOR
+%token TRY
+%token CATCH
+%token THROW
+%token FINALLY
 
 %left OR
 %left AND
@@ -212,6 +216,7 @@ expression_list_empty : %empty          { Console::ParserLog("expression_list_em
 
 statement : '{' statement_list_empty '}'    { Console::ParserLog("statement ('{' statement_list_empty '}')"); $$ = $2; }
           | expression ';'                  { Console::ParserLog("statement (expression ';')"); $$ = StmtNode::ExprStmt($1); }
+          | try_statement                   { Console::ParserLog("statement (try_statement)"); $$ = $1; }
           | while_statement                 { Console::ParserLog("statement (while_statement)"); $$ = $1; }
           | for_statement                   { Console::ParserLog("statement (for_statement)"); $$ = $1; }
           | foreach_statement               { Console::ParserLog("statement (foreach_statement)"); $$ = $1; }
@@ -219,6 +224,7 @@ statement : '{' statement_list_empty '}'    { Console::ParserLog("statement ('{'
           | switch_statement                { Console::ParserLog("statement (switch_statement)"); $$ = $1; }
           | ECHO_KW expression_list ';'     { Console::ParserLog("statement (ECHO_KW expression_list ';')"); $$ = StmtNode::Echo($2); }
           | RETURN expression ';'           { Console::ParserLog("statement (RETURN expression ';')"); $$ = StmtNode::ReturnStmt($2); }
+          | THROW expression ';'            { Console::ParserLog("statement (THROW expression ';')"); $$ = StmtNode::ThrowStmt($2); }
           | RETURN ';'                      { Console::ParserLog("statement (RETURN ';')"); $$ = StmtNode::ReturnStmt(); }
           | BREAK ';'                       { Console::ParserLog("statement (BREAK ';')"); $$ = StmtNode::BreakStmt(); }
           | CONTINUE ';'                    { Console::ParserLog("statement (CONTINUE ';')"); $$ = StmtNode::ContinueStmt(); }
@@ -233,6 +239,24 @@ statement_list_empty : %empty           { Console::ParserLog("statement_list_emp
                      | statement_list   { Console::ParserLog("statement_list_empty (statement_list)"); $$ = $1; }
                      ;
 
+try_statement : TRY '{' statement_list_empty '}' catch_list                 { Console::ParserLog("try_statement (TRY '{' statement_list_empty '}' catch_list)"); $$ = StmtNode::TryCatchStmt($3, $5); }
+              | TRY '{' statement_list_empty '}' finally_clause             { Console::ParserLog("try_statement (TRY '{' statement_list_empty '}' finally_clause)"); $$ = StmtNode::TryFinallyStmt($3, $5); }
+              | TRY '{' statement_list_empty '}' catch_list finally_clause  { Console::ParserLog("try_statement (TRY '{' statement_list_empty '}' catch_list finally_clause)"); $$ = StmtNode::TryCatchFinallyStmt($3, $5, $6); }
+              ;
+
+catch_list : catch_clause               { Console::ParserLog("catch_list (catch_clause)"); $$ = StmtNode::StmtList($1); }
+           | catch_list catch_clause    { Console::ParserLog("catch_list (catch_list catch_clause)"); $$ = StmtNode::AppendToStmtList($1, $2); }
+           ;
+
+catch_clause : CATCH '(' id_list '$' ID ')' '{' statement_list_empty '}'     { Console::ParserLog("catch_clause (CATCH '(' ID '$' ID ')' '{' statement_list_empty '}')"); $$ = StmtNode::CatchStmt($8, $3, $5); }
+             ;
+
+id_list : ID                { Console::ParserLog("id_list (ID)"); $$ = ValueNode::ValueList(ValueNode::CreateIdentifier($1)); }
+        | id_list '|' ID    { Console::ParserLog("id_list (id_list '|' ID)"); $$ = ValueNode::AppendToValueList($1, ValueNode::CreateIdentifier($3)); }
+        ;
+
+finally_clause : FINALLY '{' statement_list_empty '}'   { Console::ParserLog("finally_clause (FINALLY '{' statement_list_empty '}')"); $$ = StmtNode::FinallyStmt($3); }
+               ;
 
 while_statement : WHILE '(' expression ')' statement                        { Console::ParserLog("while_statement (WHILE '(' expression ')' statement)"); $$ = StmtNode::While($3, $5); }
                 | WHILE '(' expression ')' ':' statement_list ENDWHILE ';'  { Console::ParserLog("while_statement (WHILE '(' expression ')' ':' statement_list ENDWHILE ';')"); $$ = StmtNode::While($3, $6); }

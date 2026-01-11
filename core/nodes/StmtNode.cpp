@@ -13,69 +13,48 @@ string StmtNode::toJson() const {
     j["id"] = GetId();
     j["type"] = toString(type);
 
-    switch (type) {
-        case ST_EXPRESSION:
-        case ST_ECHO:
-        case ST_RETURN:
-            if (expr != nullptr) {
-                j["expr"] = json::parse(expr->toJson());
-            }
-            break;
+    if (expr != nullptr) {
+        j["expr"] = json::parse(expr->toJson());
+    }
 
-        case ST_WHILE:
-        case ST_DO_WHILE:
-            if (condition != nullptr) {
-                j["cond"] = json::parse(condition->toJson());
-            }
-            break;
+    if (catchStmt != nullptr) {
+        j["catch"] = json::parse(catchStmt->toJson());
+    }
+    if (catchId != "") {
+        j["catchId"] = catchId;
+    }
+    if (catchType != nullptr) {
+        j["catchType"] = json::parse(catchType->toJson());
+    }
+    if (finallyStmt != nullptr) {
+        j["finally"] = json::parse(finallyStmt->toJson());
+    }
 
-        case ST_FOR:
-            if (loopInitializer != nullptr) {
-                j["init"] = json::parse(loopInitializer->toJson());
-            }
-            if (condition != nullptr) {
-                j["cond"] = json::parse(condition->toJson());
-            }
-            if (loopEndAction != nullptr) {
-                j["action"] = json::parse(loopEndAction->toJson());
-            }
-            break;
+    if (loopInitializer != nullptr) {
+        j["init"] = json::parse(loopInitializer->toJson());
+    }
+    if (condition != nullptr) {
+        j["cond"] = json::parse(condition->toJson());
+    }
+    if (loopEndAction != nullptr) {
+        j["action"] = json::parse(loopEndAction->toJson());
+    }
 
-        case ST_FOREACH:
-            if (foreachCollection != nullptr) {
-                j["collection"] = json::parse(foreachCollection->toJson());
-            }
-            if (foreachKey != nullptr) {
-                j["key"] = json::parse(foreachKey->toJson());
-            }
-            if (foreachValue != nullptr) {
-                j["value"] = json::parse(foreachValue->toJson());
-            }
-            break;
+    if (foreachCollection != nullptr) {
+        j["collection"] = json::parse(foreachCollection->toJson());
+    }
+    if (foreachKey != nullptr) {
+        j["key"] = json::parse(foreachKey->toJson());
+    }
+    if (foreachValue != nullptr) {
+        j["value"] = json::parse(foreachValue->toJson());
+    }
 
-        case ST_IF:
-        case ST_ELSE_IF:
-        case ST_ELSE:
-            if (condition != nullptr) {
-                j["if"] = json::parse(condition->toJson());
-            }
-            if (elseIfStmt != nullptr) {
-                j["elif"] = json::parse(elseIfStmt->toJson());
-            }
-            if (elseStmt != nullptr) {
-                j["else"] = json::parse(elseStmt->toJson());
-            }
-            break;
-
-        case ST_SWITCH:
-        case ST_CASE:
-            if (expr != nullptr) {
-                j["expr"] = json::parse(expr->toJson());
-            }
-            break;
-
-        default:
-            break;
+    if (elseIfStmt != nullptr) {
+        j["elif"] = json::parse(elseIfStmt->toJson());
+    }
+    if (elseStmt != nullptr) {
+        j["else"] = json::parse(elseStmt->toJson());
     }
 
     if (!children.empty()) {
@@ -165,6 +144,24 @@ string StmtNode::toDot() const {
         result += elseStmt->toDot();
     }
 
+    if (catchStmt != nullptr) {
+        result += "  node" + std::to_string(GetId()) + " -> node" + std::to_string(catchStmt->GetId()) +
+                " [label=catchStmt];\n";
+        result += catchStmt->toDot();
+    }
+
+    if (catchType != nullptr) {
+        result += "  node" + std::to_string(GetId()) + " -> node" + std::to_string(catchType->GetId()) +
+                " [label=\"catchType, catchId: " + catchId + "\"];\n";
+        result += catchType->toDot();
+    }
+
+    if (finallyStmt != nullptr) {
+        result += "  node" + std::to_string(GetId()) + " -> node" + std::to_string(finallyStmt->GetId()) +
+                " [label=finallyStmt];\n";
+        result += finallyStmt->toDot();
+    }
+
     if (stmt != nullptr) {
         result += "  node" + std::to_string(GetId()) + " -> node" + std::to_string(stmt->GetId()) + " [label=stmt];\n";
         result += stmt->toDot();
@@ -251,6 +248,10 @@ bool StmtNode::doSemantics() {
         case ST_CONTINUE:
             // TODO ST_CONTINUE
             Warn("ST_CONTINUE not implemented");
+            break;
+        case ST_TRY:
+            // TODO ST_TRY
+            Warn("ST_TRY not implemented");
             break;
         default:
             Error("unknown enum type");
@@ -445,6 +446,60 @@ StmtNode *StmtNode::ReturnStmt(ExprNode *expr) {
     auto node = new StmtNode();
     node->type = ST_RETURN;
     node->expr = expr;
+    node->WriteToFiles();
+    return node;
+}
+
+StmtNode *StmtNode::ThrowStmt(ExprNode *expr) {
+    auto node = new StmtNode();
+    node->type = ST_THROW;
+    node->expr = expr;
+    node->WriteToFiles();
+    return node;
+}
+
+StmtNode *StmtNode::CatchStmt(StmtNode *stmt, ValueNode *catchType, string *catchId) {
+    auto node = new StmtNode();
+    node->type = ST_CATCH;
+    node->stmt = stmt;
+    node->catchType = catchType;
+    node->catchId = *catchId;
+    node->WriteToFiles();
+    return node;
+}
+
+StmtNode *StmtNode::FinallyStmt(StmtNode *stmt) {
+    auto node = new StmtNode();
+    node->type = ST_FINALLY;
+    node->stmt = stmt;
+    node->WriteToFiles();
+    return node;
+}
+
+StmtNode *StmtNode::TryCatchStmt(StmtNode *stmt, StmtNode *catchStmt) {
+    auto node = new StmtNode();
+    node->type = ST_TRY;
+    node->stmt = stmt;
+    node->catchStmt = catchStmt;
+    node->WriteToFiles();
+    return node;
+}
+
+StmtNode *StmtNode::TryFinallyStmt(StmtNode *stmt, StmtNode *finallyStmt) {
+    auto node = new StmtNode();
+    node->type = ST_TRY;
+    node->stmt = stmt;
+    node->finallyStmt = finallyStmt;
+    node->WriteToFiles();
+    return node;
+}
+
+StmtNode *StmtNode::TryCatchFinallyStmt(StmtNode *stmt, StmtNode *catchStmt, StmtNode *finallyStmt) {
+    auto node = new StmtNode();
+    node->type = ST_TRY;
+    node->stmt = stmt;
+    node->catchStmt = catchStmt;
+    node->finallyStmt = finallyStmt;
     node->WriteToFiles();
     return node;
 }
