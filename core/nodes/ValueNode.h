@@ -54,6 +54,8 @@ public:
     static ValueNode *CreateType(string *name);
 
     static ValueNode *CreateTypeNull();
+
+    static ValueNode *CreateTypeArray();
 };
 
 #endif //PHP_COMPILER_VALUE_H

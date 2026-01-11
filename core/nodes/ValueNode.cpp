@@ -218,3 +218,11 @@ ValueNode *ValueNode::CreateTypeNull() {
     v->WriteToFiles();
     return v;
 }
+
+ValueNode *ValueNode::CreateTypeArray() {
+    auto v = new ValueNode();
+    v->type = ValueType::TYPE_TYPE;
+    v->name = "array";
+    v->WriteToFiles();
+    return v;
+}

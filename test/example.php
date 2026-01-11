@@ -1,35 +1,18 @@
 <?php
-//function typedFunction(string|SimpleClass $param, int $anotherParam): string|int|null
-//{
-//    $something = "string content";
-//
-//    if ($something == "string") {
-//        return "string";
-//    }
-//
-//    return "Number: " . $param;
-//}
 
-class SimpleClass
+function buildUser(array $input): array
 {
-    var string|null $vars = "hi";
-    const vars = "hi", something = "no";
-
-    private static string|null $_var = "bye";
-
-    private function simpleFunc(): string|int|null
-    {
-        return null;
-    }
-
-    static function simpleFunc2(int $hi): void
-    {
-    }
-
-//    static function simpleFunc3(): string
-//    {
-//    }
+    return array(
+        "id" => $input["id"],
+        "name" => $input["name"],
+        "active" => true
+    );
 }
 
-//echo SimpleClass::simpleFunc2()
-?>
+$userData = array(
+    "id" => 10,
+    "name" => "Alice"
+);
+
+$user = buildUser($userData);
+print_r($user);

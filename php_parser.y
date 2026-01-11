@@ -309,6 +309,7 @@ type_list : type                { Console::ParserLog("type_list (type)"); $$ = V
 type : TYPE { Console::ParserLog("type (TYPE)"); $$ = ValueNode::CreateType($1); }
      | ID   { Console::ParserLog("type (ID)"); $$ = ValueNode::CreateIdentifier($1); }
      | NIL  { Console::ParserLog("type (NIL)"); $$ = ValueNode::CreateTypeNull(); }
+     | ARRAY  { Console::ParserLog("type (ARRAY)"); $$ = ValueNode::CreateTypeArray(); }
      ;
 
 parameter_function_list_empty : %empty              { Console::ParserLog("parameter_function_list_empty (empty)"); $$ = nullptr; }
