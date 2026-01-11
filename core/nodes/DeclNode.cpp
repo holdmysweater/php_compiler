@@ -154,11 +154,13 @@ bool DeclNode::doSemantics() {
         case DT_UNKNOWN:
             Warn("unknown type");
             return true;
+
         case DT_LIST:
             for (const auto &child: children) {
                 isOk = isOk && child->doSemantics();
             }
             break;
+
         case DT_CLASS:
             // Class names are case-insensitive
             for (char &c: name) {
@@ -175,18 +177,22 @@ bool DeclNode::doSemantics() {
             //!!! TODO maybe check if the function names / var / const names are the same (separately)
             Warn("DT_CLASS implementation is unfinished");
             break;
+
         case DT_PROPERTY:
             // TODO property logic
             Warn("DT_PROPERTY not implemented");
             break;
+
         case DT_PARAMETER:
             // TODO parameter logic
             Warn("DT_PARAMETER not implemented");
             break;
+
         case DT_CONSTANT:
             // TODO const logic
             Warn("DT_CONSTANT not implemented");
             break;
+
         case DT_FUNCTION:
         case DT_METHOD:
             // Function names are case-insensitive
@@ -211,6 +217,7 @@ bool DeclNode::doSemantics() {
             //!!! TODO check if all paths return something and type check for the returns
             Warn("DT_FUNCTION/DT_METHOD implementation is unfinished");
             break;
+
         default:
             Error("unknown enum type");
             return false;

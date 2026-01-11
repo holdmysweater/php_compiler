@@ -67,9 +67,71 @@ string ExprNode::toDot() const {
 }
 
 bool ExprNode::doSemantics() {
-    // TODO semantics for expr node
-    Console::Warning("ExprNode::doSemantics is empty");
-    return true;
+    Log("starting semantics for " + toString(type) + "...");
+
+    bool isOk = true;
+
+    for (const auto &child: children) {
+        isOk = isOk && child->doSemantics();
+    }
+
+    switch (type) {
+        case ExprType::ET_UNKNOWN:
+            Warn("unknown type");
+            return true;
+
+        case ExprType::ET_FUNCTION_CALL:
+            if (this->children[0]->isSimple()) {
+                isOk = false;
+                Warn("(ET_FUNCTION_CALL) unexpected simple first child");
+                break;
+            }
+            if (this->children[0]->type == ExprType::ET_ID) {
+                // Function name to lower case
+                for (char &c: this->children[0]->value->name) {
+                    c = tolower(static_cast<unsigned char>(c));
+                }
+
+                // fgets and fgetc for stdin only
+                if ((this->children[0]->value->name == "fgets" || this->children[0]->value->name == "fgetc")
+                    && !((this->children[1]->type == ExprType::ET_ID && this->children[1]->value->name == "STDIN")
+                         || (this->children[1]->type == ExprType::ET_EXPR_LIST && this->children[1]->children.size() ==
+                             1 && this->children[1]->children[0]->type == ExprType::ET_ID && this->children[1]->children
+                             [0]->value->name == "STDIN"))) {
+                    Error("(ET_FUNCTION_CALL) only STDIN stream allowed");
+                    break;
+                }
+            }
+            break;
+
+        case ExprType::ET_PROPERTY_ACCESS:
+        case ExprType::ET_STATIC_PROPERTY_ACCESS:
+            if (this->children[0]->isSimple()) {
+                isOk = false;
+                Warn("(ET_PROPERTY_ACCESS/ET_STATIC_PROPERTY_ACCESS) unexpected simple first child");
+                break;
+            }
+            break;
+
+        default:
+            break;
+    }
+
+    if (isOk) {
+        Log("finished semantics for " + toString(type) + "");
+    } else {
+        Error("semantics for " + toString(type) + " failed");
+    }
+
+    return isOk;
+}
+
+bool ExprNode::isSimple() const {
+    return this->type == ExprType::ET_INT ||
+           this->type == ExprType::ET_FLOAT ||
+           this->type == ExprType::ET_STRING ||
+           this->type == ExprType::ET_BOOL ||
+           this->type == ExprType::ET_NIL;
 }
 
 // List

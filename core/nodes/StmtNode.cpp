@@ -180,79 +180,238 @@ bool StmtNode::doSemantics() {
     Log("starting semantics for " + toString(type) + "...");
 
     bool isOk = true;
+    bool isFoundDefaultCase = false;
+    StmtNode *initMatched, *doWhileBody = nullptr;
+    ExprNode *exprNode = nullptr;
+
+    if (this->stmt != nullptr) {
+        isOk = isOk && this->stmt->doSemantics();
+    } else {
+        Log("(default) skipped stmt");
+    }
+
+    if (this->expr != nullptr) {
+        isOk = isOk && this->expr->doSemantics();
+    } else {
+        Log("(default) skipped expr");
+    }
+
     switch (type) {
         case ST_UNKNOWN:
             Warn("unknown type");
             return true;
+
         case ST_STMT_LIST:
             for (const auto &child: children) {
                 isOk = isOk && child->doSemantics();
             }
             break;
-        case ST_EXPRESSION:
-            // TODO ST_EXPRESSION
-            Warn("ST_EXPRESSION not implemented");
-            break;
+
         case ST_WHILE:
-            // TODO ST_WHILE
-            Warn("ST_WHILE not implemented");
-            break;
         case ST_DO_WHILE:
-            // TODO ST_DO_WHILE
-            Warn("ST_DO_WHILE not implemented");
+            if (this->condition != nullptr) {
+                isOk = isOk && this->condition->doSemantics();
+            } else {
+                Log("(ST_WHILE/ST_DO_WHILE) skipped condition");
+            }
             break;
+
         case ST_FOR:
-            // TODO ST_FOR
-            Warn("ST_FOR not implemented");
+            if (this->loopInitializer != nullptr) {
+                isOk = isOk && this->loopInitializer->doSemantics();
+            } else {
+                Log("(ST_FOR) skipped loopInitializer");
+            }
+
+            if (this->condition != nullptr) {
+                isOk = isOk && this->condition->doSemantics();
+            } else {
+                Log("(ST_FOR) skipped condition");
+            }
+
+            if (this->loopEndAction != nullptr) {
+                isOk = isOk && this->loopEndAction->doSemantics();
+            } else {
+                Log("(ST_FOR) skipped loopEndAction");
+            }
             break;
+
         case ST_FOREACH:
-            // TODO ST_FOREACH
-            Warn("ST_FOREACH not implemented");
+            if (this->foreachCollection != nullptr) {
+                isOk = isOk && this->foreachCollection->doSemantics();
+            } else {
+                Log("(ST_FOREACH) skipped foreachCollection");
+            }
+
+            if (this->foreachKey != nullptr) {
+                isOk = isOk && this->foreachKey->doSemantics();
+            } else {
+                Log("(ST_FOREACH) skipped foreachKey");
+            }
+
+            if (this->foreachValue != nullptr) {
+                isOk = isOk && this->foreachValue->doSemantics();
+            } else {
+                Log("(ST_FOREACH) skipped foreachValue");
+            }
+
+            //!!!TODO checkForeachElement aka if it's an array / itterable (check what could be as an expr here)
+            Warn("ST_FOREACH implementation is unfinished");
             break;
+
         case ST_IF:
-            // TODO ST_IF
-            Warn("ST_IF not implemented");
+            if (this->condition != nullptr) {
+                isOk = isOk && this->condition->doSemantics();
+            } else {
+                Log("(ST_IF) skipped condition");
+            }
+
+            if (this->elseIfStmt != nullptr) {
+                isOk = isOk && this->elseIfStmt->doSemantics();
+            } else {
+                Log("(ST_IF) skipped elseIfStmt");
+            }
+
+            if (this->elseStmt != nullptr) {
+                isOk = isOk && this->elseStmt->doSemantics();
+            } else {
+                Log("(ST_IF) skipped elseStmt");
+            }
             break;
-        case ST_ELSE_IF:
-            // TODO ST_ELSE_IF
-            Warn("ST_ELSE_IF not implemented");
-            break;
-        case ST_ELSE:
-            // TODO ST_ELSE
-            Warn("ST_ELSE not implemented");
-            break;
+
         case ST_SWITCH:
-            // TODO ST_SWITCH
-            Warn("ST_SWITCH not implemented");
+            // Check if there's multiple default cases
+            for (const auto &child: children) {
+                if (isFoundDefaultCase && child->type == ST_CASE_DEFAULT) {
+                    isOk = false;
+                    Error("ST_SWITCH has multiple default cases");
+                    break;
+                }
+
+                if (child->type == ST_CASE_DEFAULT) {
+                    isFoundDefaultCase = true;
+                }
+            }
+
+            // Change to do-while
+            this->type = ST_STMT_LIST;
+            this->children.clear();
+            if (this->stmt == nullptr) {
+                this->expr = nullptr;
+                Warn("ST_SWITCH is empty");
+                break;
+            }
+
+            initMatched = StmtNode::ExprStmt(
+                ExprNode::Assign(
+                    ExprNode::Sigil(ExprNode::Id(new string("___F___"))),
+                    ExprNode::Int(0)
+                )
+            );
+
+
+            this->children.push_back(initMatched);
+
+            doWhileBody = StmtNode::StmtList(nullptr);
+
+            for (const auto &caseChild: this->stmt->children) {
+                switch (caseChild->type) {
+                    case ST_CASE_DEFAULT:
+                        exprNode = ExprNode::GreatOrEqual(
+                            ExprNode::Sigil(ExprNode::Id(new string("___F___"))),
+                            ExprNode::Int(1)
+                        );
+                        break;
+                    case ST_CASE:
+                        exprNode = ExprNode::OrLower(
+                            ExprNode::Equal(this->expr, caseChild->expr),
+                            ExprNode::Equal(
+                                ExprNode::Sigil(ExprNode::Id(new string("___F___"))),
+                                ExprNode::Int(1)
+                            )
+                        );
+                        break;
+                    default:
+                        isOk = false;
+                        Error("invalid case");
+                        continue;
+                }
+
+                StmtNode::AppendToStmtList(
+                    doWhileBody,
+                    StmtNode::If(
+                        exprNode,
+                        StmtNode::AppendToStmtList(
+                            StmtNode::StmtList(
+                                StmtNode::ExprStmt(
+                                    ExprNode::Assign(
+                                        ExprNode::Sigil(ExprNode::Id(new string("___F___"))),
+                                        ExprNode::Int(1)
+                                    )
+                                )
+                            ),
+                            caseChild->stmt
+                        )
+                    )
+                );
+            }
+
+            StmtNode::AppendToStmtList(
+                doWhileBody,
+                StmtNode::If(
+                    ExprNode::Equal(
+                        ExprNode::Sigil(ExprNode::Id(new string("___F___"))),
+                        ExprNode::Int(0)
+                    ),
+                    StmtNode::ExprStmt(
+                        ExprNode::Assign(
+                            ExprNode::Sigil(ExprNode::Id(new string("___F___"))),
+                            ExprNode::Int(2)
+                        )
+                    )
+                )
+            );
+
+            this->children.push_back(
+                StmtNode::DoWhile(
+                    ExprNode::NotEqual(
+                        ExprNode::Sigil(ExprNode::Id(new string("___F___"))),
+                        ExprNode::Int(2)),
+                    doWhileBody
+                )
+            );
+
+            this->expr = nullptr;
+            this->stmt = nullptr;
+
+            Warn("ST_SWITCH implementation is unfinished");
             break;
-        case ST_CASE:
-            // TODO ST_CASE
-            Warn("ST_CASE not implemented");
-            break;
-        case ST_CASE_DEFAULT:
-            // TODO ST_CASE_DEFAULT
-            Warn("ST_CASE_DEFAULT not implemented");
-            break;
-        case ST_ECHO:
-            // TODO ST_ECHO
-            Warn("ST_ECHO not implemented");
-            break;
-        case ST_RETURN:
-            // TODO ST_RETURN
-            Warn("ST_RETURN not implemented");
-            break;
-        case ST_BREAK:
-            // TODO ST_BREAK
-            Warn("ST_BREAK not implemented");
-            break;
-        case ST_CONTINUE:
-            // TODO ST_CONTINUE
-            Warn("ST_CONTINUE not implemented");
-            break;
+
         case ST_TRY:
-            // TODO ST_TRY
-            Warn("ST_TRY not implemented");
+            if (this->catchStmt != nullptr) {
+                isOk = isOk && this->catchStmt->doSemantics();
+            } else {
+                Log("(ST_TRY) skipped catchStmt");
+            }
+
+            if (this->finallyStmt != nullptr) {
+                isOk = isOk && this->finallyStmt->doSemantics();
+            } else {
+                Log("(ST_TRY) skipped finallyStmt");
+            }
             break;
+
+        case ST_CASE:
+        case ST_CASE_DEFAULT:
+        case ST_ECHO:
+        case ST_RETURN:
+        case ST_BREAK:
+        case ST_CONTINUE:
+        case ST_EXPRESSION:
+        case ST_ELSE_IF:
+        case ST_ELSE:
+            break;
+
         default:
             Error("unknown enum type");
             return false;

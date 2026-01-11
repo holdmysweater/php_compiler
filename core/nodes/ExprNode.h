@@ -24,6 +24,8 @@ public:
 
     bool doSemantics() override;
 
+    bool isSimple() const;
+
     // List
     static ExprNode *ExprList(ExprNode *expr);
 
