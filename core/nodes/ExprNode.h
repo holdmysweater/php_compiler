@@ -15,6 +15,7 @@ public:
     ExprType type = ExprType::ET_UNKNOWN;
     ValueNode *value = nullptr;
     vector<ExprNode *> children;
+    string name;
 
     string _getClassName() const override;
 

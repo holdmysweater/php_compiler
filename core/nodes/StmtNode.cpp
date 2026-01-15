@@ -89,7 +89,11 @@ string StmtNode::toDot() const {
         pos += 2;
     }
 
-    result += "  node" + std::to_string(GetId()) + " [label=\"" + label + "\", fillcolor=\"#ADD8E6\", style=filled];\n";
+    result += "  node" + std::to_string(GetId()) + " [label=\"" + label + "\", fillcolor=\"";
+    result += type == ST_STMT_LIST
+                  ? "#91BCC9"
+                  : "#ADD8E6";
+    result += "\", style=filled];\n";
 
     if (expr != nullptr) {
         result += "  node" + std::to_string(GetId()) + " -> node" + std::to_string(expr->GetId()) + " [label=expr];\n";
@@ -167,9 +171,10 @@ string StmtNode::toDot() const {
         result += stmt->toDot();
     }
 
+    int i = 0;
     for (const auto &child: children) {
         result += "  node" + std::to_string(GetId()) + " -> node" + std::to_string(child->GetId()) +
-                " [label=children];\n";
+                " [label=child" + std::to_string(i++) + "];\n";
         result += child->toDot();
     }
 
@@ -415,6 +420,131 @@ bool StmtNode::doSemantics() {
         default:
             Error("unknown enum type");
             return false;
+    }
+
+    if (condition != nullptr && condition->type == ExprType::ET_EXPR_LIST) {
+        if (condition->children.size() == 1) {
+            auto list = condition;
+            condition = list->children[0];
+            delete list;
+        } else {
+            Warn("condition is a list");
+        }
+    }
+
+    if (expr != nullptr && expr->type == ExprType::ET_EXPR_LIST) {
+        if (expr->children.size() == 1) {
+            auto list = expr;
+            expr = list->children[0];
+            delete list;
+        } else {
+            Warn("expr is a list");
+        }
+    }
+
+    if (loopInitializer != nullptr && loopInitializer->type == ExprType::ET_EXPR_LIST) {
+        if (loopInitializer->children.size() == 1) {
+            auto list = loopInitializer;
+            loopInitializer = list->children[0];
+            delete list;
+        } else {
+            Warn("loopInitializer is a list");
+        }
+    }
+
+    if (loopEndAction != nullptr && loopEndAction->type == ExprType::ET_EXPR_LIST) {
+        if (loopEndAction->children.size() == 1) {
+            auto list = loopEndAction;
+            loopEndAction = list->children[0];
+            delete list;
+        } else {
+            Warn("loopEndAction is a list");
+        }
+    }
+    if (foreachCollection != nullptr && foreachCollection->type == ExprType::ET_EXPR_LIST) {
+        if (foreachCollection->children.size() == 1) {
+            auto list = foreachCollection;
+            foreachCollection = list->children[0];
+            delete list;
+        } else {
+            Warn("foreachCollection is a list");
+        }
+    }
+
+    if (foreachKey != nullptr && foreachKey->type == ExprType::ET_EXPR_LIST) {
+        if (foreachKey->children.size() == 1) {
+            auto list = foreachKey;
+            foreachKey = list->children[0];
+            delete list;
+        } else {
+            Warn("foreachKey is a list");
+        }
+    }
+
+    if (foreachValue != nullptr && foreachValue->type == ExprType::ET_EXPR_LIST) {
+        if (foreachValue->children.size() == 1) {
+            auto list = foreachValue;
+            foreachValue = list->children[0];
+            delete list;
+        } else {
+            Warn("foreachValue is a list");
+        }
+    }
+
+    if (stmt != nullptr && stmt->type == ST_STMT_LIST) {
+        if (stmt->children.size() == 1) {
+            auto list = stmt;
+            stmt = list->children[0];
+            delete list;
+        } else {
+            Warn("stmt is a list");
+        }
+    }
+
+    if (elseIfStmt != nullptr && elseIfStmt->type == ST_STMT_LIST) {
+        if (elseIfStmt->children.size() == 1) {
+            auto list = elseIfStmt;
+            elseIfStmt = list->children[0];
+            delete list;
+        } else {
+            Warn("elseIfStmt is a list");
+        }
+    }
+
+    if (elseStmt != nullptr && elseStmt->type == ST_STMT_LIST) {
+        if (elseStmt->children.size() == 1) {
+            auto list = elseStmt;
+            elseStmt = list->children[0];
+            delete list;
+        } else {
+            Warn("elseStmt is a list");
+        }
+    }
+
+    if (elseStmt != nullptr && elseStmt->type == ST_ELSE) {
+        auto list = elseStmt;
+        elseStmt = list->stmt;
+        delete list;
+    }
+
+    if (catchStmt != nullptr && catchStmt->type == ST_STMT_LIST) {
+        if (catchStmt->children.size() == 1) {
+            auto list = catchStmt;
+            catchStmt = list->children[0];
+            delete list;
+        } else {
+            Warn("catchStmt is a list");
+        }
+    }
+
+    if (finallyStmt != nullptr && finallyStmt->type == ST_STMT_LIST) {
+        if (finallyStmt->children.size() == 1) {
+            auto list = finallyStmt;
+            finallyStmt = list->children[0];
+            delete list;
+        } else {
+            Warn("finallyStmt is a list");
+        }
     }
 
     if (isOk) {

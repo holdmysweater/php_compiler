@@ -17,6 +17,10 @@ string ExprNode::toJson() const {
         j["value"] = json::parse(value->toJson());
     }
 
+    if (!name.empty()) {
+        j["name"] = name;
+    }
+
     if (!children.empty()) {
         json childrenArray = json::array();
         for (const auto &child: children) {
@@ -37,6 +41,9 @@ string ExprNode::toDot() const {
 #endif
 
     label += toSymbol(type);
+    if (!name.empty()) {
+        label += "\\n" + name;
+    }
 
 #ifdef NODE_DOT_LABEL_DEBUG
     label += "\\n" + toString(type);
@@ -49,7 +56,13 @@ string ExprNode::toDot() const {
         pos += 2;
     }
 
-    result += "  node" + std::to_string(GetId()) + " [label=\"" + label + "\", fillcolor=\"#90EE90\", style=filled];\n";
+    result += "  node" + std::to_string(GetId()) + " [label=\"" + label + "\", fillcolor=\"";
+    result += type == ExprType::ET_ID
+                  ? "#DBABFF"
+                  : type == ExprType::ET_EXPR_LIST
+                        ? "#81C781"
+                        : "#90EE90";
+    result += "\", style=filled];\n";
 
     if (value != nullptr) {
         result += "  node" + std::to_string(GetId()) + " -> node" + std::to_string(value->GetId()) +
@@ -57,9 +70,10 @@ string ExprNode::toDot() const {
         result += value->toDot();
     }
 
+    int i = 0;
     for (const auto &child: children) {
         result += "  node" + std::to_string(GetId()) + " -> node" + std::to_string(child->GetId()) +
-                " [label=children];\n";
+                " [label=child" + std::to_string(i++) + "];\n";
         result += child->toDot();
     }
 
@@ -132,15 +146,15 @@ bool ExprNode::doSemantics() {
             }
             break;
 
-        case ExprType::ET_ARRAY_ELEMENT_LIST:
+        case ExprType::ET_EXPR_LIST:
+            break;
+
+        default:
             if (this->children.size() == 1 && this->children[0]->type == ExprType::ET_EXPR_LIST) {
                 auto list = this->children[0];
                 this->children = list->children;
                 delete list;
             }
-            break;
-
-        default:
             break;
     }
 
@@ -756,7 +770,7 @@ ExprNode *ExprNode::String(string *value) {
 ExprNode *ExprNode::Id(string *name) {
     auto node = new ExprNode();
     node->type = ExprType::ET_ID;
-    node->value = ValueNode::CreateIdentifier(name);
+    node->name = *name;
     node->WriteToFiles();
     return node;
 }

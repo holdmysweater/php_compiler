@@ -67,9 +67,10 @@ string ElementNode::toDot() const {
     result += "  node" + std::to_string(GetId()) + " [label=\"" + label +
             "\", fillcolor=\"lightgrey\", style=filled];\n";
 
+    int i = 0;
     for (const auto &child: children) {
         result += "  node" + std::to_string(GetId()) + " -> node" + std::to_string(child->GetId()) +
-                " [label=children];\n";
+                " [label=child" + std::to_string(i++) + "];\n";
         result += child->toDot();
     }
 
