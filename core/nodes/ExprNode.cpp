@@ -104,12 +104,39 @@ bool ExprNode::doSemantics() {
             }
             break;
 
+        case ExprType::ET_ASSIGN:
+            if (children[0]->type != ExprType::ET_SIGIL && children[0]->type != ExprType::ET_ARRAY_INDEX) {
+                Error("(ET_ASSIGN) left child isn't a SIGIL or ARRAY_INDEX (" + children[0]->toJson() + ")");
+                isOk = false;
+                break;
+            }
+
+            if (children[0]->type == ExprType::ET_ARRAY_INDEX) {
+                this->type = ExprType::ET_ARRAY_ASSIGNMENT;
+                const ExprNode *left = children[0];
+                ExprNode *right = children[1];
+                children.clear();
+                children.push_back(left->children[0]);
+                children.push_back(left->children[1]);
+                children.push_back(right);
+                delete left;
+            }
+            break;
+
         case ExprType::ET_PROPERTY_ACCESS:
         case ExprType::ET_STATIC_PROPERTY_ACCESS:
             if (this->children[0]->isSimple()) {
                 isOk = false;
                 Warn("(ET_PROPERTY_ACCESS/ET_STATIC_PROPERTY_ACCESS) unexpected simple first child");
                 break;
+            }
+            break;
+
+        case ExprType::ET_ARRAY_ELEMENT_LIST:
+            if (this->children.size() == 1 && this->children[0]->type == ExprType::ET_EXPR_LIST) {
+                auto list = this->children[0];
+                this->children = list->children;
+                delete list;
             }
             break;
 

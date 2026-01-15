@@ -61,6 +61,7 @@ enum class ExprType {
     ET_UMINUS,
     ET_SIGIL,
     ET_ARRAY_ELEMENT_LIST,
+    ET_ARRAY_ASSIGNMENT,
     ET_ARRAY_INDEX,
     ET_ARRAY_APPEND,
     ET_ARRAY_EMPTY,
@@ -135,6 +136,7 @@ inline string toString(ExprType type) {
         case ExprType::ET_UMINUS: return "ET_UMINUS";
         case ExprType::ET_SIGIL: return "ET_SIGIL";
         case ExprType::ET_ARRAY_ELEMENT_LIST: return "ET_ARRAY_ELEMENT_LIST";
+        case ExprType::ET_ARRAY_ASSIGNMENT: return "ET_ARRAY_ASSIGNMENT";
         case ExprType::ET_ARRAY_INDEX: return "ET_ARRAY_INDEX";
         case ExprType::ET_ARRAY_APPEND: return "ET_ARRAY_APPEND";
         case ExprType::ET_ARRAY_EMPTY: return "ET_ARRAY_EMPTY";
@@ -211,7 +213,8 @@ inline string toSymbol(ExprType type) {
         case ExprType::ET_UMINUS: return "-";
         case ExprType::ET_SIGIL: return "$";
         case ExprType::ET_ARRAY_ELEMENT_LIST: return "[list]";
-        case ExprType::ET_ARRAY_INDEX: return "index[]";
+        case ExprType::ET_ARRAY_ASSIGNMENT: return "arr[i]=value";
+        case ExprType::ET_ARRAY_INDEX: return "[index]";
         case ExprType::ET_ARRAY_APPEND: return "[]=";
         case ExprType::ET_ARRAY_EMPTY: return "empty []";
         case ExprType::ET_ARRAY_KEY_ACCESS: return "[ => ]";
