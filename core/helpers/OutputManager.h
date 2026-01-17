@@ -17,7 +17,7 @@ public:
 
     static void OutputDot(const std::string &dotContent, const std::string &baseName, bool isLogEnabled);
 
-    static void OutputBytecode(const std::vector<uint8_t> &bytecode, const std::string &baseName);
+    static std::ofstream GetByteCodeFile(const std::string &baseName);
 
 private:
     static fs::path EnsureOutputDir();

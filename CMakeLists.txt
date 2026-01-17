@@ -47,6 +47,9 @@ add_custom_command(
         VERBATIM
 )
 
+# Add jvm-class-builder
+add_subdirectory(jvm-class-builder)
+
 # Core sources
 set(CORE_SOURCES
         core/helpers/Config.cpp
@@ -78,11 +81,17 @@ set(AST_SOURCES
         core/nodes/RawDeclModifier.cpp
 )
 
+# Byte code sources
+set(BYTE_CODE_SOURCES
+        core/bytecode/ByteCodeHelper.cpp
+)
+
 # Create executable
 add_executable(php_compiler
         main.cpp
         ${CORE_SOURCES}
         ${AST_SOURCES}
+        ${BYTE_CODE_SOURCES}
         ${GENERATED_LEXER_CPP}
         ${GENERATED_PARSER_CPP}
 )
@@ -97,3 +106,7 @@ target_include_directories(php_compiler PRIVATE
         "${GENERATED_DIR}"
 )
 
+# Link libraries
+target_link_libraries(php_compiler PRIVATE
+        jvm::ClassBuilder
+)
