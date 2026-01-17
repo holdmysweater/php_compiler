@@ -19,6 +19,8 @@ public:
 
     static std::ofstream GetByteCodeFile(const std::string &baseName);
 
+    static void EnsureEmbeddedPhpRuntime();
+
 private:
     static fs::path EnsureOutputDir();
 

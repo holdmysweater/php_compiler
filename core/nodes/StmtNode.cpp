@@ -1,6 +1,10 @@
 #include "StmtNode.h"
 #include "core/helpers/Console.h"
 #include "json.hpp"
+#include "core/bytecode/StmtBuilder.h"
+#include "jvm/attribute-code.h"
+#include "jvm/descriptor-method.h"
+#include "jvm/method.h"
 
 using json = nlohmann::json;
 
@@ -561,16 +565,92 @@ Class *StmtNode::processClass(Class *root, std::vector<Class *> &list) {
 
     bool isOk = true;
 
-    switch (type) {
+    try {
+        Method *mainMethod = root->getOrCreateMethod(
+            "main",
+            DescriptorMethod(
+                std::nullopt, // void
+                {DescriptorField("java/lang/String", 1)} // String[] args
+            )
+        );
+
+        mainMethod->addFlag(Method::ACC_PUBLIC);
+        mainMethod->addFlag(Method::ACC_STATIC);
+
+        AttributeCode *code = mainMethod->getCodeAttribute();
+
+        addStmt(root, mainMethod, code);
+
+        *code << code->ReturnVoid();
+    } catch (const std::exception &e) {
+        isOk = false;
+        Error(std::string("StmtNode::processClass failed: ") + e.what());
     }
 
     if (isOk) {
-        Log("finished semantics for " + toString(type) + "");
+        Log("finished semantics for " + toString(type));
     } else {
         Error("semantics for " + toString(type) + " failed");
     }
 
     return root;
+}
+
+AttributeCode *StmtNode::addStmt(Class *root, Method *method, AttributeCode *code) const {
+    if (root == nullptr) {
+        throw std::logic_error("StmtNode::addStmt: root is null");
+    }
+    if (method == nullptr) {
+        throw std::logic_error("StmtNode::addStmt: method is null");
+    }
+    if (code == nullptr) {
+        throw std::logic_error("StmtNode::addStmt: code is null");
+    }
+
+    switch (type) {
+        case ST_STMT_LIST: {
+            for (StmtNode *child: children) {
+                if (child != nullptr) {
+                    code = child->addStmt(root, method, code);
+                }
+            }
+            return code;
+        }
+
+        case ST_ECHO: {
+            StmtBuilder::EmitEcho(root, method, code, expr);
+            return code;
+        }
+
+        case ST_EXPRESSION: {
+            // Typically: evaluate expr and discard result.
+            // Once ExprNode codegen exists, do:
+            // expr->addExpr(root, method, code); then pop result (probably PopOne()).
+            Warn("ST_EXPRESSION bytecode not implemented yet");
+            return code;
+        }
+
+        case ST_WHILE:
+        case ST_DO_WHILE:
+        case ST_FOR:
+        case ST_FOREACH:
+        case ST_IF:
+        case ST_ELSE_IF:
+        case ST_ELSE:
+        case ST_SWITCH:
+        case ST_CASE:
+        case ST_CASE_DEFAULT:
+        case ST_RETURN:
+        case ST_THROW:
+        case ST_TRY:
+        case ST_CATCH:
+        case ST_FINALLY:
+        case ST_BREAK:
+        case ST_CONTINUE:
+        default:
+            Warn("no bytecode implementation for " + toString(type));
+            return code;
+    }
 }
 
 // List

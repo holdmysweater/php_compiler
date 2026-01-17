@@ -84,6 +84,8 @@ set(AST_SOURCES
 # Byte code sources
 set(BYTE_CODE_SOURCES
         core/bytecode/ByteCodeHelper.cpp
+        core/bytecode/StmtBuilder.cpp
+        core/bytecode/ExprBuilder.cpp
 )
 
 # Create executable

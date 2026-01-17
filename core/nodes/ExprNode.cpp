@@ -168,19 +168,6 @@ bool ExprNode::doSemantics() {
 }
 
 Class *ExprNode::processClass(Class *root, std::vector<Class *> &list) {
-    Log("starting bytecode generation for " + toString(type) + "...");
-
-    bool isOk = true;
-
-    switch (type) {
-    }
-
-    if (isOk) {
-        Log("finished semantics for " + toString(type) + "");
-    } else {
-        Error("semantics for " + toString(type) + " failed");
-    }
-
     return root;
 }
 

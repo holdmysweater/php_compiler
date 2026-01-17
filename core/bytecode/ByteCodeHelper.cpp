@@ -23,32 +23,26 @@ void ByteCodeHelper::GenerateAndExecute(ElementNode *root, const string &fileNam
         VerboseFile(byteCodeClass->getClassName());
     }
 
+    try {
+        OutputManager::EnsureEmbeddedPhpRuntime();
+    } catch (...) {
+        Console::SystemError("Bytecode execution aborted due to missing runtime.");
+        return;
+    }
+
     ExecuteFile(fileName);
 }
 
 
 vector<Class *> ByteCodeHelper::GenerateClasses(ElementNode *root, const string &className) {
-    Class *byteCodeClass = new Class(className, "java/lang/Object");
+    auto *byteCodeClass = new Class(className, "java/lang/Object");
 
     byteCodeClass->addFlag(Class::ACC_SUPER);
     byteCodeClass->addFlag(Class::ACC_PUBLIC);
 
-    Method *mainMethod = byteCodeClass->getOrCreateMethod(
-        "main",
-        DescriptorMethod{
-            std::nullopt,
-            {{"java/lang/String", 1}}
-        }
-    );
-
-    mainMethod->addFlag(Method::ACC_PUBLIC);
-    mainMethod->addFlag(Method::ACC_STATIC);
-
-    AttributeCode *baseCode = mainMethod->getCodeAttribute();
-    *baseCode << baseCode->ReturnVoid();
-
     std::vector<Class *> classes;
     byteCodeClass = root->processClass(byteCodeClass, classes);
+
     classes.push_back(byteCodeClass);
 
     return classes;

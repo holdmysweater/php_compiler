@@ -1,2 +1,10 @@
 <?php
-echo "Hello world";
+echo "dfjkewlfkjlefe";
+
+class Hi
+{
+}
+
+function something()
+{
+}

@@ -4,7 +4,6 @@
 #include "core/nodes/ElementNode.h"
 #include "jvm/class.h"
 
-
 class ByteCodeHelper {
 public:
     static void GenerateAndExecute(ElementNode *root, const string &fileName);
@@ -18,6 +17,5 @@ protected:
 
     static void VerboseFile(const string &baseName);
 };
-
 
 #endif //PHP_COMPILER_BYTECODEHELPER_H

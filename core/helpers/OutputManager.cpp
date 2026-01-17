@@ -3,6 +3,26 @@
 #include "Console.h"
 
 #include <fstream>
+#include "../bytecode/assets/BasePhpValue_runtime_all.h"
+
+
+struct EmbeddedClassFile {
+    const char* relPath;
+    const unsigned char* bytes;
+    unsigned int len;
+};
+
+static const EmbeddedClassFile kPhpRuntimeFiles[] = {
+    {"com/phpjvm/BasePhpValue.class", BasePhpValue_class, BasePhpValue_class_len},
+    {"com/phpjvm/BasePhpValue$PhpArray.class", BasePhpValue_PhpArray_class, BasePhpValue_PhpArray_class_len},
+    {"com/phpjvm/BasePhpValue$PhpKey$K.class", BasePhpValue_PhpKey_K_class, BasePhpValue_PhpKey_K_class_len},
+    {"com/phpjvm/BasePhpValue$PhpKey.class", BasePhpValue_PhpKey_class, BasePhpValue_PhpKey_class_len},
+    {"com/phpjvm/BasePhpValue$PhpNumber.class", BasePhpValue_PhpNumber_class, BasePhpValue_PhpNumber_class_len},
+    {"com/phpjvm/BasePhpValue$PhpRuntimeException.class", BasePhpValue_PhpRuntimeException_class, BasePhpValue_PhpRuntimeException_class_len},
+    {"com/phpjvm/BasePhpValue$Type.class", BasePhpValue_Type_class, BasePhpValue_Type_class_len},
+};
+static const std::size_t kPhpRuntimeFilesCount = sizeof(kPhpRuntimeFiles) / sizeof(kPhpRuntimeFiles[0]);
+
 
 fs::path OutputManager::EnsureOutputDir() {
     fs::path outputDir = Config::GetOutputDir();
@@ -100,4 +120,38 @@ std::ofstream OutputManager::GetByteCodeFile(const std::string &baseName) {
     fs::path classFilePath = bytecodeDir / (baseName + ".class");
     std::ofstream file(classFilePath, std::ios::binary);
     return file;
+}
+
+static void WriteBytesToFile(const fs::path &path, const unsigned char *data, unsigned int len) {
+    fs::create_directories(path.parent_path());
+
+    std::ofstream out(path, std::ios::binary | std::ios::trunc);
+    if (!out.is_open()) {
+        throw std::runtime_error("Could not open file for writing: " + path.string());
+    }
+
+    out.write(reinterpret_cast<const char *>(data), static_cast<std::streamsize>(len));
+    out.flush();
+
+    if (!out.good()) {
+        throw std::runtime_error("Failed writing bytes to: " + path.string());
+    }
+}
+
+void OutputManager::EnsureEmbeddedPhpRuntime() {
+    fs::path outputDir = EnsureOutputDir();
+
+    try {
+        for (std::size_t i = 0; i < kPhpRuntimeFilesCount; i++) {
+            const auto& f = kPhpRuntimeFiles[i];
+
+            fs::path outPath = outputDir / fs::path(f.relPath);
+
+            WriteBytesToFile(outPath, f.bytes, f.len);
+            Console::SystemLog(std::string("Runtime ensured: '") + outPath.string() + "'");
+        }
+    } catch (const std::exception& e) {
+        Console::SystemError(std::string("Failed to ensure runtime classes: ") + e.what());
+        throw;
+    }
 }

@@ -132,6 +132,21 @@ Class *ElementNode::processClass(Class *root, std::vector<Class *> &list) {
     bool isOk = true;
 
     switch (type) {
+        case ElementType::ELEMENT_PROGRAM_LIST:
+            for (auto child: children) {
+                root = child->processClass(root, list);
+            }
+            break;
+        case ElementType::ELEMENT_STATEMENT:
+            this->stmt->processClass(root, list);
+            break;
+        case ElementType::ELEMENT_CLASS_DECL:
+        case ElementType::ELEMENT_FUNC_DECL:
+            this->decl->processClass(root, list);
+            break;
+        default:
+            Warn("no processing implementation for " + toString(type));
+            break;
     }
 
     if (isOk) {

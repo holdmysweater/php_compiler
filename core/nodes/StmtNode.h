@@ -4,6 +4,7 @@
 #include "BaseNode.h"
 #include "ExprNode.h"
 #include "enums/StmtType.h"
+#include "jvm/attribute-code.h"
 
 #include <vector>
 
@@ -44,6 +45,8 @@ public:
     bool doSemantics() override;
 
     Class *processClass(Class *root, std::vector<Class *> &list) override;
+
+    AttributeCode *addStmt(Class *root, Method *method, AttributeCode *code) const;
 
     // List
     static StmtNode *StmtList(StmtNode *stmt);

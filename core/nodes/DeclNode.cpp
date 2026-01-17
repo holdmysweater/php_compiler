@@ -239,6 +239,9 @@ Class *DeclNode::processClass(Class *root, std::vector<Class *> &list) {
     bool isOk = true;
 
     switch (type) {
+        default:
+            Warn("no processing implementation for " + toString(type));
+            break;
     }
 
     if (isOk) {
