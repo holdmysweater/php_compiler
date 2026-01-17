@@ -25,6 +25,8 @@ public:
 
     bool doSemantics() override;
 
+    Class *processClass(Class *root, std::vector<Class *> &list) override;
+
     bool isSimple() const;
 
     // List

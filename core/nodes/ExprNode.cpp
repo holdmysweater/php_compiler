@@ -167,6 +167,23 @@ bool ExprNode::doSemantics() {
     return isOk;
 }
 
+Class *ExprNode::processClass(Class *root, std::vector<Class *> &list) {
+    Log("starting bytecode generation for " + toString(type) + "...");
+
+    bool isOk = true;
+
+    switch (type) {
+    }
+
+    if (isOk) {
+        Log("finished semantics for " + toString(type) + "");
+    } else {
+        Error("semantics for " + toString(type) + " failed");
+    }
+
+    return root;
+}
+
 bool ExprNode::isSimple() const {
     return this->type == ExprType::ET_INT ||
            this->type == ExprType::ET_FLOAT ||

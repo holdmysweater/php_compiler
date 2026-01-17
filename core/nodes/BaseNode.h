@@ -6,7 +6,10 @@
 #include <cstdint>
 #include <string>
 
+#include "jvm/class.h"
+
 using std::string;
+using namespace jvm;
 
 class BaseNode {
 protected:
@@ -36,6 +39,8 @@ public:
     virtual string toDot() const = 0;
 
     virtual bool doSemantics() = 0;
+
+    virtual Class *processClass(Class *root, std::vector<Class *> &list) = 0;
 };
 
 #endif //PHP_COMPILER_BASENODE_H

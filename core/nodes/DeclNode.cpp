@@ -233,6 +233,23 @@ bool DeclNode::doSemantics() {
     return isOk;
 }
 
+Class *DeclNode::processClass(Class *root, std::vector<Class *> &list) {
+    Log("starting bytecode generation for " + toString(type) + "...");
+
+    bool isOk = true;
+
+    switch (type) {
+    }
+
+    if (isOk) {
+        Log("finished semantics for " + toString(type) + "");
+    } else {
+        Error("semantics for " + toString(type) + " failed");
+    }
+
+    return root;
+}
+
 DeclNode *DeclNode::DeclList(DeclNode *decl) {
     auto node = new DeclNode();
     node->type = DT_LIST;

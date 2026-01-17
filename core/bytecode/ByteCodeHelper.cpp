@@ -2,73 +2,56 @@
 
 #include <filesystem>
 #include <fstream>
+#include <optional>
 
 #include <jvm/class.h>
 #include <jvm/method.h>
-#include <jvm/descriptor-method.h>
 
 #include "core/helpers/Config.h"
 #include "core/helpers/Console.h"
 #include "core/helpers/OutputManager.h"
+#include "jvm/descriptor-method.h"
 
 using namespace jvm;
 
 
 void ByteCodeHelper::GenerateAndExecute(ElementNode *root, const string &fileName) {
-    Class byteCodeClass = GenerateClass(root, fileName);
+    vector<Class *> classes = GenerateClasses(root, fileName);
 
-    WriteClassToFile(fileName, byteCodeClass);
+    for (auto byteCodeClass: classes) {
+        WriteClassToFile(byteCodeClass->getClassName(), *byteCodeClass);
+        VerboseFile(byteCodeClass->getClassName());
+    }
 
     ExecuteFile(fileName);
 }
 
 
-Class ByteCodeHelper::GenerateClass(ElementNode *root, const string &className) {
-    Class byteCodeClass(className, "java/lang/Object");
+vector<Class *> ByteCodeHelper::GenerateClasses(ElementNode *root, const string &className) {
+    Class *byteCodeClass = new Class(className, "java/lang/Object");
 
-    Method *mainMethod = byteCodeClass.getOrCreateMethod(
+    byteCodeClass->addFlag(Class::ACC_SUPER);
+    byteCodeClass->addFlag(Class::ACC_PUBLIC);
+
+    Method *mainMethod = byteCodeClass->getOrCreateMethod(
         "main",
         DescriptorMethod{
             std::nullopt,
-            {{"java/lang/String", 1}} // String[] args
+            {{"java/lang/String", 1}}
         }
     );
-
-    byteCodeClass.addFlag(Class::ACC_SUPER);
-    byteCodeClass.addFlag(Class::ACC_PUBLIC);
 
     mainMethod->addFlag(Method::ACC_PUBLIC);
     mainMethod->addFlag(Method::ACC_STATIC);
 
-    // --- constants for System.out.println("Hello, world!") ---
-    // Field: java/lang/System.out : Ljava/io/PrintStream;
-    auto descriptor_field_out = DescriptorField("java/io/PrintStream");
-    ConstantFieldref *systemOut = byteCodeClass.getOrCreateFieldrefConstant(
-        "java/lang/System",
-        "out",
-        descriptor_field_out
-    );
+    AttributeCode *baseCode = mainMethod->getCodeAttribute();
+    *baseCode << baseCode->ReturnVoid();
 
-    auto descriptor_method_println = DescriptorMethod(
-        std::nullopt,
-        {{"java/lang/String"}}
-    );
+    std::vector<Class *> classes;
+    byteCodeClass = root->processClass(byteCodeClass, classes);
+    classes.push_back(byteCodeClass);
 
-    // Method: java/io/PrintStream.println : (Ljava/lang/String;)V
-    ConstantMethodref *println = byteCodeClass.getOrCreateMethodrefConstant(
-        "java/io/PrintStream",
-        "println",
-        descriptor_method_println
-    );
-
-    AttributeCode *code = mainMethod->getCodeAttribute();
-    *code
-            << code->GetStatic(systemOut)
-            << code->PushString("Hello, World!")
-            << code->InvokeVirtual(println)
-            << code->ReturnVoid();
-
-    return byteCodeClass;
+    return classes;
 }
 
 
@@ -79,8 +62,8 @@ void ByteCodeHelper::WriteClassToFile(const string &fileName, Class byteCodeClas
 }
 
 
-void ByteCodeHelper::ExecuteFile(const string &baseName) {
-    Console::SystemLog("Executing verbose of bytecode...");
+void ByteCodeHelper::VerboseFile(const string &baseName) {
+    Console::SystemLog("Executing verbose of " + baseName + "...");
 
     std::string cmd = "javap -verbose \"" + Config::GetOutputDir().string() + baseName + ".class\"";
 
@@ -91,11 +74,16 @@ void ByteCodeHelper::ExecuteFile(const string &baseName) {
         return;
     }
 
-    Console::SystemLog("Bytecode verbose successful!");
-    Console::SystemLog("Executing bytecode...");
-
     cmd += " > " + Config::GetOutputDir().string() + "output_verbose.txt";
     system(cmd.c_str());
+
+    Console::SystemLog("Bytecode verbose successful!");
+}
+
+
+void ByteCodeHelper::ExecuteFile(const string &baseName) {
+    std::string cmd;
+    Console::SystemLog("Executing bytecode...");
 
     cmd = "java -cp \"" + Config::GetOutputDir().string() + "\\\" " + baseName;
 

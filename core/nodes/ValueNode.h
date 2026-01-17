@@ -31,6 +31,8 @@ public:
 
     bool doSemantics() override;
 
+    Class *processClass(Class *root, std::vector<Class *> &list) override;
+
     // List methods
     static ValueNode *ValueList(ValueNode *value);
 

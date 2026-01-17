@@ -126,6 +126,23 @@ bool ElementNode::doSemantics() {
     return isOk;
 }
 
+Class *ElementNode::processClass(Class *root, std::vector<Class *> &list) {
+    Log("starting bytecode generation for " + toString(type) + "...");
+
+    bool isOk = true;
+
+    switch (type) {
+    }
+
+    if (isOk) {
+        Log("finished semantics for " + toString(type) + "");
+    } else {
+        Error("semantics for " + toString(type) + " failed");
+    }
+
+    return root;
+}
+
 ElementNode *ElementNode::EmptyElement() {
     auto node = new ElementNode();
     node->type = ElementType::ELEMENT_EMPTY;

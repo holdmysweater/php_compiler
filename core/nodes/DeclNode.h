@@ -42,6 +42,8 @@ public:
 
     bool doSemantics() override;
 
+    Class *processClass(Class *root, std::vector<Class *> &list) override;
+
     // List
     static DeclNode *DeclList(DeclNode *decl);
 

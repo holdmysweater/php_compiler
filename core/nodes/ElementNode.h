@@ -21,6 +21,8 @@ public:
 
     bool doSemantics() override;
 
+    Class *processClass(Class *root, std::vector<Class *> &list) override;
+
     // List
     static ElementNode *EmptyElement();
 
