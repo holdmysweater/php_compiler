@@ -40,10 +40,18 @@ fs::path OutputManager::EnsureOutputDir() {
 }
 
 void OutputManager::GenerateSvgFromDot(const fs::path &dotFilePath) {
+#ifdef DISABLE_ALL_LOGS
+    return;
+#endif
+
     GenerateSvgFromDot(dotFilePath, false);
 }
 
 void OutputManager::GenerateSvgFromDot(const fs::path &dotFilePath, bool isLogEnabled) {
+#ifdef DISABLE_ALL_LOGS
+    return;
+#endif
+
     fs::path svgFile = fs::path(dotFilePath.string() + ".svg");
     std::string svgCommand = "dot -Tsvg \"" + dotFilePath.string() + "\" -o \"" + svgFile.string() + "\"";
 
@@ -59,10 +67,17 @@ void OutputManager::GenerateSvgFromDot(const fs::path &dotFilePath, bool isLogEn
 }
 
 void OutputManager::OutputJson(const std::string &jsonContent, const std::string &baseName) {
+#ifdef DISABLE_ALL_LOGS
+    return;
+#endif
+
     OutputJson(jsonContent, baseName, false);
 }
 
 void OutputManager::OutputJson(const std::string &jsonContent, const std::string &baseName, bool isLogEnabled) {
+#ifdef DISABLE_ALL_LOGS
+    return;
+#endif
     fs::path jsonDir = EnsureOutputDir();
     fs::path jsonPath = jsonDir / (baseName + "_ast.json");
 
@@ -79,10 +94,18 @@ void OutputManager::OutputJson(const std::string &jsonContent, const std::string
 }
 
 void OutputManager::OutputDot(const std::string &dotContent, const std::string &baseName) {
+#ifdef DISABLE_ALL_LOGS
+    return;
+#endif
+
     OutputDot(dotContent, baseName, false);
 }
 
 void OutputManager::OutputDot(const std::string &dotContent, const std::string &baseName, bool isLogEnabled) {
+#ifdef DISABLE_ALL_LOGS
+    return;
+#endif
+
     fs::path dotDir = EnsureOutputDir();
     fs::path dotPath = dotDir / (baseName + "_tree.dot");
 

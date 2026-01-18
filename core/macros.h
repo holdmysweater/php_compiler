@@ -3,7 +3,8 @@
 
 
 /* IMPORTANT */
-// #define DISABLE_ALL_LOGS
+#define DISABLE_ALL_LOGS
+// #define DISABLE_BYTECODE_EXECUTION
 
 /* System debug */
 #define CONSOLE_SYSTEM_LOG_ENABLED

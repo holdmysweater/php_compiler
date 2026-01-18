@@ -30,7 +30,9 @@ void ByteCodeHelper::GenerateAndExecute(ElementNode *root, const string &fileNam
         return;
     }
 
+#ifndef DISABLE_BYTECODE_EXECUTION
     ExecuteFile(fileName);
+#endif
 }
 
 

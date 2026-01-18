@@ -129,7 +129,11 @@ int main(int argc, char *argv[]) {
 
     Console::SystemTitle("Bytecode initiation...");
 
+#ifndef DISABLE_ALL_LOGS
     Config::SetOutputDir(outputDir + "/bytecode/");
+#else
+    Config::SetOutputDir(outputDir);
+#endif
 
     ByteCodeHelper::GenerateAndExecute(root, baseName);
 
