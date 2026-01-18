@@ -1,3 +1,6 @@
 [submodule "jvm-class-builder"]
 	path = jvm-class-builder
 	url = https://github.com/holdmysweater/jvm-class-builder.git
+[submodule "test/java-tests-for-php-compiler"]
+	path = test/java-tests-for-php-compiler
+	url = https://github.com/holdmysweater/java-tests-for-php-compiler.git
