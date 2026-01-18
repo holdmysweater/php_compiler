@@ -405,6 +405,19 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
         )
     );
 
+    auto *rtCallFunction = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/PhpRuntime",
+        "callFunction",
+        DescriptorMethod(
+            DescriptorField("com/phpjvm/BasePhpValue"),
+            {
+                DescriptorField("java/lang/String"),
+                DescriptorField("com/phpjvm/BasePhpValue", 1) // BasePhpValue[]
+            }
+        )
+    );
+
+
     if (expr == nullptr) {
         *code << code->GetStatic(nullValueField);
         return;
@@ -840,10 +853,8 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
                 return;
             }
 
-            // ---- IMPORTANT: your AST encodes `new A()` as ET_FUNCTION_CALL(ET_NEW(A), args) ----
+            // ET_FUNCTION_CALL(ET_NEW(...), args) -> newObject
             if (fn->type == ExprType::ET_NEW) {
-                // ET_NEW node in your tree often only has the class name (ET_ID "A")
-                // Args are on the ET_FUNCTION_CALL node.
                 const ExprNode *classNameExpr = childOrNull(fn, 0);
                 std::string className = idText(classNameExpr);
 
@@ -855,11 +866,10 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
 
                 *code << code->PushString(className);
                 emitArgsArray(root, method, code, argsNode);
-                *code << code->InvokeStatic(rtNewObject); // BasePhpValue (OBJECT)
+                *code << code->InvokeStatic(rtNewObject);
                 return;
             }
 
-            // ---- normal global function call: foo(args) ----
             std::string fnName = lowerCopy(idText(fn));
             if (fnName.empty()) {
                 Console::Warning("ET_FUNCTION_CALL: missing function name (pushing NULL)");
@@ -867,19 +877,44 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
                 return;
             }
 
-            // convention: compile global functions as static methods on the program class:
-            //   static BasePhpValue foo(BasePhpValue[] args)
+            // ---- builtins (stdin) ----
+            if (fnName == "fgets" || fnName == "fgetc") {
+                *code << code->PushString(fnName);
+                emitArgsArray(root, method, code, argsNode); // args ignored by runtime for now
+                *code << code->InvokeStatic(rtCallFunction);
+                return;
+            }
+
+            // ---- user-defined global functions: static on program class ----
             auto *callFn = root->getOrCreateMethodrefConstant(
                 root->getClassName(),
                 fnName,
                 DescriptorMethod(
                     DescriptorField("com/phpjvm/BasePhpValue"),
-                    {DescriptorField("com/phpjvm/BasePhpValue", 1)} // BasePhpValue[]
+                    {DescriptorField("com/phpjvm/BasePhpValue", 1)}
                 )
             );
 
-            emitArgsArray(root, method, code, argsNode); // BasePhpValue[]
-            *code << code->InvokeStatic(callFn); // BasePhpValue
+            emitArgsArray(root, method, code, argsNode);
+            *code << code->InvokeStatic(callFn);
+            return;
+        }
+
+        // ===== identifier constant (e.g. STDIN) =====
+        case ExprType::ET_ID: {
+            std::string name = idText(expr);
+
+            // Special stream constants (you can extend this later)
+            if (name == "STDIN" || name == "STDOUT" || name == "STDERR") {
+                *code << code->PushString(name);
+                *code << code->InvokeStatic(ofString); // BasePhpValue.of(String)
+                return;
+            }
+
+            // If a bare identifier ever appears as an expression, treat it as a string constant for now.
+            // (Better: add a proper "constant table" / define() support later.)
+            *code << code->PushString(name);
+            *code << code->InvokeStatic(ofString);
             return;
         }
 

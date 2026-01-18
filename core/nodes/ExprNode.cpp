@@ -94,29 +94,63 @@ bool ExprNode::doSemantics() {
             Warn("unknown type");
             return true;
 
-        case ExprType::ET_FUNCTION_CALL:
-            if (this->children[0]->isSimple()) {
+        case ExprType::ET_FUNCTION_CALL: {
+            if (this->children.empty() || this->children[0] == nullptr) {
+                Error("(ET_FUNCTION_CALL) missing callee");
                 isOk = false;
-                Warn("(ET_FUNCTION_CALL) unexpected simple first child");
                 break;
             }
-            if (this->children[0]->type == ExprType::ET_ID) {
-                // Function name to lower case
-                for (char &c: this->children[0]->value->name) {
-                    c = tolower(static_cast<unsigned char>(c));
+
+            ExprNode *callee = this->children[0];
+
+            // args may be missing (0 args) depending on your parser
+            ExprNode *argsNode = (this->children.size() >= 2 ? this->children[1] : nullptr);
+
+            // Normalize args to ET_EXPR_LIST when present
+            if (argsNode != nullptr && argsNode->type != ExprType::ET_EXPR_LIST) {
+                ExprNode *list = new ExprNode();
+                list->type = ExprType::ET_EXPR_LIST;
+                list->children.push_back(argsNode);
+                list->WriteToFiles();
+
+                this->children[1] = list;
+                argsNode = list;
+            }
+
+            // Only validate builtin stream rules when callee is a plain identifier
+            if (callee->type == ExprType::ET_ID) {
+                // Function name is stored in `name` for ET_ID
+                for (char &c: callee->name) {
+                    c = (char) tolower((unsigned char) c);
                 }
 
-                // fgets and fgetc for stdin only
-                if ((this->children[0]->value->name == "fgets" || this->children[0]->value->name == "fgetc")
-                    && !((this->children[1]->type == ExprType::ET_ID && this->children[1]->value->name == "STDIN")
-                         || (this->children[1]->type == ExprType::ET_EXPR_LIST && this->children[1]->children.size() ==
-                             1 && this->children[1]->children[0]->type == ExprType::ET_ID && this->children[1]->children
-                             [0]->value->name == "STDIN"))) {
-                    Error("(ET_FUNCTION_CALL) only STDIN stream allowed");
-                    break;
+                // fgets / fgetc are allowed only with STDIN
+                if (callee->name == "fgets" || callee->name == "fgetc") {
+                    // must have exactly one argument
+                    if (argsNode == nullptr) {
+                        Error("(ET_FUNCTION_CALL) " + callee->name + " requires 1 argument (STDIN)");
+                        isOk = false;
+                        break;
+                    }
+
+                    // argsNode is ET_EXPR_LIST now
+                    if (argsNode->children.size() != 1 || argsNode->children[0] == nullptr) {
+                        Error("(ET_FUNCTION_CALL) " + callee->name + " requires exactly 1 argument (STDIN)");
+                        isOk = false;
+                        break;
+                    }
+
+                    ExprNode *arg0 = argsNode->children[0];
+                    if (!(arg0->type == ExprType::ET_ID && arg0->name == "STDIN")) {
+                        Error("(ET_FUNCTION_CALL) only STDIN stream allowed for " + callee->name);
+                        isOk = false;
+                        break;
+                    }
                 }
             }
+
             break;
+        }
 
         case ExprType::ET_ASSIGN:
             if (children[0]->type != ExprType::ET_SIGIL && children[0]->type != ExprType::ET_ARRAY_INDEX) {
