@@ -334,7 +334,7 @@ Class *DeclNode::processClass(Class *root, std::vector<Class *> &list) {
         }
 
         case DT_CLASS: {
-            // Create a brand-new JVM class for the PHP class
+            // create a new JVM class for the PHP class
             std::string clsName = toJvmInternalName(name);
             std::string parentName = classNameExtended.empty()
                                          ? "java/lang/Object"
@@ -346,20 +346,20 @@ Class *DeclNode::processClass(Class *root, std::vector<Class *> &list) {
 
             emitDefaultCtor(cls);
 
-            // Generate members into this class (methods/props/consts)
+            // generate class members into cls
             if (declList) {
                 declList->processClass(cls, list);
             }
 
-            // Important: add generated class to output list
+            // emit class file separately
             list.push_back(cls);
 
-            // Keep compiling in the original root class (top-level)
+            // continue compiling in original root (program class)
             break;
         }
 
         case DT_FUNCTION: {
-            // Generate a static Java method on the current root class:
+            // global function on current root:
             // BasePhpValue name(BasePhpValue[] args)
             std::string fn = toLowerAscii(name);
 
@@ -369,20 +369,18 @@ Class *DeclNode::processClass(Class *root, std::vector<Class *> &list) {
 
             AttributeCode *code = m->getCodeAttribute();
 
-            // Compile body using your statement emitter (NOT StmtNode::processClass which hardcodes main)
             if (stmt) {
+                // IMPORTANT: don't call stmt->processClass (it creates main)
                 stmt->addStmt(root, m, code);
             }
 
-            // Default return NULL (until you fully implement ST_RETURN everywhere)
+            // until ST_RETURN is implemented everywhere
             emitReturnNull(root, code);
             break;
         }
 
         case DT_METHOD: {
-            // Compile PHP methods into the current class as Java static methods.
-            // Instance: BasePhpValue m(PhpObject self, BasePhpValue[] args)
-            // Static:   BasePhpValue m(PhpClass calledClass, BasePhpValue[] args)
+            // method inside a class
             std::string mn = toLowerAscii(name);
 
             const bool phpStatic = (isStatic == 1);
@@ -391,8 +389,6 @@ Class *DeclNode::processClass(Class *root, std::vector<Class *> &list) {
             Method *m = root->getOrCreateMethod(mn, sig);
 
             applyVisibility(m, visibilityType);
-
-            // Keep it Java-static so runtime adapters can call it easily later
             m->addFlag(Method::ACC_STATIC);
 
             AttributeCode *code = m->getCodeAttribute();
@@ -408,11 +404,9 @@ Class *DeclNode::processClass(Class *root, std::vector<Class *> &list) {
         case DT_PROPERTY:
         case DT_CONSTANT:
         case DT_PARAMETER:
-            // You can add bytecode for properties/consts later (usually backing fields + init)
             Warn("DeclNode::processClass: " + toString(type) + " not implemented yet");
             break;
 
-        case DT_UNKNOWN:
         default:
             Warn("no processing implementation for " + toString(type));
             break;

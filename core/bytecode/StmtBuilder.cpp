@@ -7,18 +7,14 @@
 
 using namespace jvm;
 
-void StmtBuilder::EmitEcho(Class *root, Method *method, AttributeCode *code, ExprNode *expr) {
-    if (!root) throw std::logic_error("StmtBuilder::EmitEcho: root is null");
-    if (!method) throw std::logic_error("StmtBuilder::EmitEcho: method is null");
-    if (!code) throw std::logic_error("StmtBuilder::EmitEcho: code is null");
-
+static void emitEchoOne(Class *root, Method *method, AttributeCode *code, ExprNode *expr) {
     auto *systemOut = root->getOrCreateFieldrefConstant(
         "java/lang/System",
         "out",
         DescriptorField("java/io/PrintStream")
     );
 
-    // echo in PHP has NO newline, so prefer print(...) not println(...)
+    // echo has NO newline -> print(String)
     auto *print = root->getOrCreateMethodrefConstant(
         "java/io/PrintStream",
         "print",
@@ -37,15 +33,39 @@ void StmtBuilder::EmitEcho(Class *root, Method *method, AttributeCode *code, Exp
         )
     );
 
-    // Stack:
-    // EmitValue(expr)                   -> [BasePhpValue]
-    // invokevirtual toPhpString         -> [String]
-    // getstatic System.out              -> [String, PrintStream]
-    // swap                              -> [PrintStream, String]
-    // invokevirtual print(String)       -> []
-    ExprBuilder::EmitValue(root, method, code, expr); // push BasePhpValue
-    *code << code->InvokeVirtual(toPhpString); // pop BasePhpValue, push String
-    *code << code->GetStatic(systemOut); // push PrintStream
-    *code << code->Swap(); // reorder to [PrintStream, String]
-    *code << code->InvokeVirtual(print); // consume both
+    // EmitValue(expr) -> BasePhpValue
+    // invokevirtual toPhpString -> String
+    // getstatic System.out -> PrintStream
+    // swap -> PrintStream, String
+    // invokevirtual print -> void
+    ExprBuilder::EmitValue(root, method, code, expr);
+    *code << code->InvokeVirtual(toPhpString);
+    *code << code->GetStatic(systemOut);
+    *code << code->Swap();
+    *code << code->InvokeVirtual(print);
+}
+
+void StmtBuilder::EmitEcho(Class *root, Method *method, AttributeCode *code, ExprNode *expr) {
+    if (!root) throw std::logic_error("StmtBuilder::EmitEcho: root is null");
+    if (!method) throw std::logic_error("StmtBuilder::EmitEcho: method is null");
+    if (!code) throw std::logic_error("StmtBuilder::EmitEcho: code is null");
+
+    if (!expr) {
+        // echo null -> prints ""? In PHP echo NULL prints nothing.
+        // Your BasePhpValue.NULL_VALUE.toPhpString() should presumably be "" anyway.
+        emitEchoOne(root, method, code, nullptr);
+        return;
+    }
+
+    // IMPORTANT: your AST stores echo args as ET_EXPR_LIST
+    if (expr->type == ExprType::ET_EXPR_LIST) {
+        for (auto *ch: expr->children) {
+            if (!ch) continue;
+            emitEchoOne(root, method, code, ch);
+        }
+        return;
+    }
+
+    // normal single expression
+    emitEchoOne(root, method, code, expr);
 }

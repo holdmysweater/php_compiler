@@ -1,6 +1,7 @@
 #include "StmtNode.h"
 #include "core/helpers/Console.h"
 #include "json.hpp"
+#include "core/bytecode/ExprBuilder.h"
 #include "core/bytecode/StmtBuilder.h"
 #include "jvm/attribute-code.h"
 #include "jvm/descriptor-method.h"
@@ -426,131 +427,6 @@ bool StmtNode::doSemantics() {
             return false;
     }
 
-    if (condition != nullptr && condition->type == ExprType::ET_EXPR_LIST) {
-        if (condition->children.size() == 1) {
-            auto list = condition;
-            condition = list->children[0];
-            delete list;
-        } else {
-            Warn("condition is a list");
-        }
-    }
-
-    if (expr != nullptr && expr->type == ExprType::ET_EXPR_LIST) {
-        if (expr->children.size() == 1) {
-            auto list = expr;
-            expr = list->children[0];
-            delete list;
-        } else {
-            Warn("expr is a list");
-        }
-    }
-
-    if (loopInitializer != nullptr && loopInitializer->type == ExprType::ET_EXPR_LIST) {
-        if (loopInitializer->children.size() == 1) {
-            auto list = loopInitializer;
-            loopInitializer = list->children[0];
-            delete list;
-        } else {
-            Warn("loopInitializer is a list");
-        }
-    }
-
-    if (loopEndAction != nullptr && loopEndAction->type == ExprType::ET_EXPR_LIST) {
-        if (loopEndAction->children.size() == 1) {
-            auto list = loopEndAction;
-            loopEndAction = list->children[0];
-            delete list;
-        } else {
-            Warn("loopEndAction is a list");
-        }
-    }
-    if (foreachCollection != nullptr && foreachCollection->type == ExprType::ET_EXPR_LIST) {
-        if (foreachCollection->children.size() == 1) {
-            auto list = foreachCollection;
-            foreachCollection = list->children[0];
-            delete list;
-        } else {
-            Warn("foreachCollection is a list");
-        }
-    }
-
-    if (foreachKey != nullptr && foreachKey->type == ExprType::ET_EXPR_LIST) {
-        if (foreachKey->children.size() == 1) {
-            auto list = foreachKey;
-            foreachKey = list->children[0];
-            delete list;
-        } else {
-            Warn("foreachKey is a list");
-        }
-    }
-
-    if (foreachValue != nullptr && foreachValue->type == ExprType::ET_EXPR_LIST) {
-        if (foreachValue->children.size() == 1) {
-            auto list = foreachValue;
-            foreachValue = list->children[0];
-            delete list;
-        } else {
-            Warn("foreachValue is a list");
-        }
-    }
-
-    if (stmt != nullptr && stmt->type == ST_STMT_LIST) {
-        if (stmt->children.size() == 1) {
-            auto list = stmt;
-            stmt = list->children[0];
-            delete list;
-        } else {
-            Warn("stmt is a list");
-        }
-    }
-
-    if (elseIfStmt != nullptr && elseIfStmt->type == ST_STMT_LIST) {
-        if (elseIfStmt->children.size() == 1) {
-            auto list = elseIfStmt;
-            elseIfStmt = list->children[0];
-            delete list;
-        } else {
-            Warn("elseIfStmt is a list");
-        }
-    }
-
-    if (elseStmt != nullptr && elseStmt->type == ST_STMT_LIST) {
-        if (elseStmt->children.size() == 1) {
-            auto list = elseStmt;
-            elseStmt = list->children[0];
-            delete list;
-        } else {
-            Warn("elseStmt is a list");
-        }
-    }
-
-    if (elseStmt != nullptr && elseStmt->type == ST_ELSE) {
-        auto list = elseStmt;
-        elseStmt = list->stmt;
-        delete list;
-    }
-
-    if (catchStmt != nullptr && catchStmt->type == ST_STMT_LIST) {
-        if (catchStmt->children.size() == 1) {
-            auto list = catchStmt;
-            catchStmt = list->children[0];
-            delete list;
-        } else {
-            Warn("catchStmt is a list");
-        }
-    }
-
-    if (finallyStmt != nullptr && finallyStmt->type == ST_STMT_LIST) {
-        if (finallyStmt->children.size() == 1) {
-            auto list = finallyStmt;
-            finallyStmt = list->children[0];
-            delete list;
-        } else {
-            Warn("finallyStmt is a list");
-        }
-    }
-
     if (isOk) {
         Log("finished semantics for " + toString(type) + "");
     } else {
@@ -579,9 +455,7 @@ Class *StmtNode::processClass(Class *root, std::vector<Class *> &list) {
 
         AttributeCode *code = mainMethod->getCodeAttribute();
 
-        addStmt(root, mainMethod, code);
-
-        *code << code->ReturnVoid();
+        addStmt(root, mainMethod, code, true);
     } catch (const std::exception &e) {
         isOk = false;
         Error(std::string("StmtNode::processClass failed: ") + e.what());
@@ -596,7 +470,7 @@ Class *StmtNode::processClass(Class *root, std::vector<Class *> &list) {
     return root;
 }
 
-AttributeCode *StmtNode::addStmt(Class *root, Method *method, AttributeCode *code) const {
+AttributeCode *StmtNode::addStmt(Class *root, Method *method, AttributeCode *code, bool isMain) const {
     if (root == nullptr) {
         throw std::logic_error("StmtNode::addStmt: root is null");
     }
@@ -611,7 +485,7 @@ AttributeCode *StmtNode::addStmt(Class *root, Method *method, AttributeCode *cod
         case ST_STMT_LIST: {
             for (StmtNode *child: children) {
                 if (child != nullptr) {
-                    code = child->addStmt(root, method, code);
+                    code = child->addStmt(root, method, code, isMain);
                 }
             }
             return code;
@@ -623,30 +497,40 @@ AttributeCode *StmtNode::addStmt(Class *root, Method *method, AttributeCode *cod
         }
 
         case ST_EXPRESSION: {
-            // Typically: evaluate expr and discard result.
-            // Once ExprNode codegen exists, do:
-            // expr->addExpr(root, method, code); then pop result (probably PopOne()).
-            Warn("ST_EXPRESSION bytecode not implemented yet");
+            // Evaluate expression and discard resulting BasePhpValue
+            ExprBuilder::EmitValue(root, method, code, expr);
+            *code << code->PopOne();
             return code;
         }
 
-        case ST_WHILE:
-        case ST_DO_WHILE:
-        case ST_FOR:
-        case ST_FOREACH:
-        case ST_IF:
-        case ST_ELSE_IF:
-        case ST_ELSE:
-        case ST_SWITCH:
-        case ST_CASE:
-        case ST_CASE_DEFAULT:
-        case ST_RETURN:
-        case ST_THROW:
-        case ST_TRY:
-        case ST_CATCH:
-        case ST_FINALLY:
-        case ST_BREAK:
-        case ST_CONTINUE:
+        case ST_RETURN: {
+            // In PHP, return with no expr => NULL
+            // For main(): we must return void in JVM.
+            if (isMain) {
+                if (expr != nullptr) {
+                    ExprBuilder::EmitValue(root, method, code, expr);
+                    *code << code->PopOne(); // discard
+                }
+                *code << code->ReturnVoid();
+                return code;
+            }
+
+            // Non-main (your PHP functions/methods): return BasePhpValue reference
+            if (expr != nullptr) {
+                ExprBuilder::EmitValue(root, method, code, expr);
+            } else {
+                *code << code->GetStatic(
+                    root->getOrCreateFieldrefConstant(
+                        "com/phpjvm/BasePhpValue",
+                        "NULL_VALUE",
+                        DescriptorField("com/phpjvm/BasePhpValue")
+                    )
+                );
+            }
+
+            *code << code->ReturnReference();
+            return code;
+        }
         default:
             Warn("no bytecode implementation for " + toString(type));
             return code;

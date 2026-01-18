@@ -3,7 +3,7 @@
 #include "Console.h"
 
 #include <fstream>
-#include "../bytecode/assets/BasePhpValue_runtime_all.h"
+#include "../bytecode/assets/runtime_all.h"
 
 
 struct EmbeddedClassFile {
@@ -29,6 +29,11 @@ static const EmbeddedClassFile kPhpRuntimeFiles[] = {
         BasePhpValue_PhpTypeError_class_len
     },
     {"com/phpjvm/BasePhpValue$Type.class", BasePhpValue_Type_class, BasePhpValue_Type_class_len},
+    {"com/phpjvm/PhpClass.class", PhpClass_class, PhpClass_class_len},
+    {"com/phpjvm/PhpMethod.class", PhpMethod_class, PhpMethod_class_len},
+    {"com/phpjvm/PhpObject.class", PhpObject_class, PhpObject_class_len},
+    {"com/phpjvm/PhpRuntime.class", PhpRuntime_class, PhpRuntime_class_len},
+    {"com/phpjvm/PhpStaticMethod.class", PhpStaticMethod_class, PhpStaticMethod_class_len},
 };
 static const std::size_t kPhpRuntimeFilesCount = sizeof(kPhpRuntimeFiles) / sizeof(kPhpRuntimeFiles[0]);
 
@@ -180,7 +185,6 @@ void OutputManager::EnsureEmbeddedPhpRuntime() {
             fs::path outPath = outputDir / fs::path(f.relPath);
 
             WriteBytesToFile(outPath, f.bytes, f.len);
-            Console::SystemLog(std::string("Runtime ensured: '") + outPath.string() + "'");
         }
     } catch (const std::exception &e) {
         Console::SystemError(std::string("Failed to ensure runtime classes: ") + e.what());

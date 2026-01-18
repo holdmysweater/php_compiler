@@ -7,6 +7,7 @@
 #include "core/helpers/Console.h"
 #include "jvm/descriptor-field.h"
 #include "jvm/descriptor-method.h"
+#include "jvm/field.h"
 
 using namespace jvm;
 
@@ -40,6 +41,65 @@ static void emitUnary(
 ) {
     emitValue(root, method, code, operand); // push BasePhpValue
     *code << code->InvokeStatic(op); // pop1 push1
+}
+
+static std::string idText(const ExprNode *e) {
+    if (!e) return "";
+    if (!e->name.empty()) return e->name;
+    if (e->value) {
+        // in your semantics you sometimes use value->name for ET_ID
+        if (!e->value->name.empty()) return e->value->name;
+        // fallback if you ever store it differently
+        if (e->value->stringValue.data()) return std::string(e->value->stringValue);
+    }
+    return "";
+}
+
+static std::string lowerCopy(std::string s) {
+    for (char &c: s) c = (char) tolower((unsigned char) c);
+    return s;
+}
+
+static std::string sanitizeJavaIdent(const std::string &raw) {
+    std::string s = raw;
+    if (!s.empty() && s[0] == '$') s.erase(0, 1);
+
+    std::string out;
+    out.reserve(s.size() + 4);
+    out += "g_"; // global var prefix
+
+    for (char c: s) {
+        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_') out.push_back(c);
+        else out.push_back('_');
+    }
+
+    if (out.size() == 2) out += "var"; // "g_" only
+    if (out.size() >= 3 && (out[2] >= '0' && out[2] <= '9')) out.insert(out.begin() + 2, '_');
+    return out;
+}
+
+// Emits BasePhpValue[] on stack
+static void emitArgsArray(Class *root, Method *method, AttributeCode *code, const ExprNode *argsNode) {
+    auto *basePhpValueClass = root->getOrCreateClassConstant("com/phpjvm/BasePhpValue");
+
+    std::vector<const ExprNode *> args;
+    if (argsNode) {
+        if (argsNode->type == ExprType::ET_EXPR_LIST) {
+            for (auto *ch: argsNode->children) if (ch) args.push_back(ch);
+        } else {
+            args.push_back(argsNode);
+        }
+    }
+
+    *code << code->PushInt((int32_t) args.size());
+    *code << code->NewArray(basePhpValueClass); // BasePhpValue[]
+
+    for (size_t i = 0; i < args.size(); i++) {
+        *code << code->Duplicate(); // arr, arr
+        *code << code->PushInt((int32_t) i); // arr, arr, i
+        ExprBuilder::EmitValue(root, method, code, args[i]); // arr, arr, i, val
+        *code << code->StoreReferenceToArray(); // arr
+    }
 }
 
 void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, const ExprNode *expr) {
@@ -240,6 +300,111 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
         )
     );
 
+    // BasePhpValue instance helpers
+    auto *toBool = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/BasePhpValue",
+        "toBool",
+        DescriptorMethod(DescriptorField("Z"), {})
+    );
+
+    auto *isNull = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/BasePhpValue",
+        "isNull",
+        DescriptorMethod(DescriptorField("Z"), {})
+    );
+
+    auto *asObject = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/BasePhpValue",
+        "asObject",
+        DescriptorMethod(DescriptorField("com/phpjvm/PhpObject"), {})
+    );
+
+    // PhpRuntime calls
+    auto *rtCallMethod = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/PhpRuntime",
+        "callMethod",
+        DescriptorMethod(
+            DescriptorField("com/phpjvm/BasePhpValue"),
+            {
+                DescriptorField("com/phpjvm/PhpObject"),
+                DescriptorField("java/lang/String"),
+                DescriptorField("com/phpjvm/BasePhpValue", 1) // BasePhpValue[]
+            }
+        )
+    );
+
+    auto *rtCallStatic = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/PhpRuntime",
+        "callStatic",
+        DescriptorMethod(
+            DescriptorField("com/phpjvm/BasePhpValue"),
+            {
+                DescriptorField("com/phpjvm/PhpClass"),
+                DescriptorField("java/lang/String"),
+                DescriptorField("com/phpjvm/BasePhpValue", 1)
+            }
+        )
+    );
+
+    auto *rtNewObject = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/PhpRuntime",
+        "newObject",
+        DescriptorMethod(
+            DescriptorField("com/phpjvm/BasePhpValue"),
+            {
+                DescriptorField("java/lang/String"),
+                DescriptorField("com/phpjvm/BasePhpValue", 1)
+            }
+        )
+    );
+
+    // PhpObject property access
+    auto *objGetProp = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/PhpObject",
+        "getProperty",
+        DescriptorMethod(
+            DescriptorField("com/phpjvm/BasePhpValue"),
+            {DescriptorField("java/lang/String")}
+        )
+    );
+
+    // Arrays
+    auto *arrFactory = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/BasePhpValue",
+        "array",
+        DescriptorMethod(DescriptorField("com/phpjvm/BasePhpValue"), {})
+    );
+
+    auto *arrGet = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/BasePhpValue",
+        "arrayGet",
+        DescriptorMethod(
+            DescriptorField("com/phpjvm/BasePhpValue"),
+            {DescriptorField("com/phpjvm/BasePhpValue"), DescriptorField("com/phpjvm/BasePhpValue")}
+        )
+    );
+
+    auto *arrSet = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/BasePhpValue",
+        "arraySet",
+        DescriptorMethod(
+            std::nullopt, // void
+            {
+                DescriptorField("com/phpjvm/BasePhpValue"), DescriptorField("com/phpjvm/BasePhpValue"),
+                DescriptorField("com/phpjvm/BasePhpValue")
+            }
+        )
+    );
+
+    auto *arrAppend = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/BasePhpValue",
+        "arrayAppend",
+        DescriptorMethod(
+            std::nullopt, // void
+            {DescriptorField("com/phpjvm/BasePhpValue"), DescriptorField("com/phpjvm/BasePhpValue")}
+        )
+    );
+
     if (expr == nullptr) {
         *code << code->GetStatic(nullValueField);
         return;
@@ -404,6 +569,331 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
             emitBinary(root, method, code, childOrNull(expr, 0), childOrNull(expr, 1), boolOr, &ExprBuilder::EmitValue);
             return;
         }
+
+        // ===== variables: $x =====
+        case ExprType::ET_SIGIL: {
+            const ExprNode *id = childOrNull(expr, 0);
+            std::string var = idText(id);
+            std::string fieldName = sanitizeJavaIdent(var);
+
+            // Ensure field exists: public static BasePhpValue g_x;
+            Field *f = root->getOrCreateField(fieldName, DescriptorField("com/phpjvm/BasePhpValue"));
+            f->addFlag(Field::ACC_PUBLIC);
+            f->addFlag(Field::ACC_STATIC);
+
+            auto *fieldRef = root->getOrCreateFieldrefConstant(
+                root->getClassName(),
+                fieldName,
+                DescriptorField("com/phpjvm/BasePhpValue")
+            );
+
+            // Load static; if null -> BasePhpValue.NULL_VALUE
+            auto *L_nonNull = code->CodeLabel();
+            auto *L_end = code->CodeLabel();
+
+            *code << code->GetStatic(fieldRef); // v
+            *code << code->Duplicate(); // v v
+            *code << code->IfNotNull(L_nonNull); // pops one v; stack: v
+            *code << code->PopOne(); // pop null
+            *code << code->GetStatic(nullValueField); // push NULL_VALUE
+            *code << code->GoTo(L_end);
+
+            *code << L_nonNull; // stack: v (non-null)
+            *code << L_end;
+            return;
+        }
+
+        // ===== assignment: $x = rhs =====
+        case ExprType::ET_ASSIGN: {
+            const ExprNode *lhs = childOrNull(expr, 0);
+            const ExprNode *rhs = childOrNull(expr, 1);
+
+            if (lhs && lhs->type == ExprType::ET_SIGIL) {
+                const ExprNode *id = childOrNull(lhs, 0);
+                std::string var = idText(id);
+                std::string fieldName = sanitizeJavaIdent(var);
+
+                Field *f = root->getOrCreateField(fieldName, DescriptorField("com/phpjvm/BasePhpValue"));
+                f->addFlag(Field::ACC_PUBLIC);
+                f->addFlag(Field::ACC_STATIC);
+
+                auto *fieldRef = root->getOrCreateFieldrefConstant(
+                    root->getClassName(),
+                    fieldName,
+                    DescriptorField("com/phpjvm/BasePhpValue")
+                );
+
+                EmitValue(root, method, code, rhs); // value
+                *code << code->Duplicate(); // value value
+                *code << code->PutStatic(fieldRef); // value
+                return;
+            }
+
+            Console::Warning("ET_ASSIGN bytecode: only $var = expr implemented (pushing NULL)");
+            *code << code->GetStatic(nullValueField);
+            return;
+        }
+
+        // ===== method call: $obj->m(a,b) =====
+        case ExprType::ET_METHOD_ACCESS: {
+            const ExprNode *objExpr = childOrNull(expr, 0);
+            const ExprNode *nameExpr = childOrNull(expr, 1);
+            const ExprNode *argsNode = childOrNull(expr, 2);
+
+            std::string methodName = idText(nameExpr);
+            if (methodName.empty()) {
+                Console::Warning("ET_METHOD_ACCESS: missing method name (pushing NULL)");
+                *code << code->GetStatic(nullValueField);
+                return;
+            }
+
+            EmitValue(root, method, code, objExpr); // BasePhpValue (object)
+            *code << code->InvokeVirtual(asObject); // PhpObject
+
+            *code << code->PushString(methodName); // String
+            emitArgsArray(root, method, code, argsNode); // BasePhpValue[]
+
+            *code << code->InvokeStatic(rtCallMethod); // BasePhpValue
+            return;
+        }
+
+        // ===== property read: $obj->prop =====
+        case ExprType::ET_PROPERTY_ACCESS: {
+            const ExprNode *objExpr = childOrNull(expr, 0);
+            const ExprNode *nameExpr = childOrNull(expr, 1);
+
+            std::string propName = idText(nameExpr);
+            if (propName.empty()) {
+                Console::Warning("ET_PROPERTY_ACCESS: missing property name (pushing NULL)");
+                *code << code->GetStatic(nullValueField);
+                return;
+            }
+
+            EmitValue(root, method, code, objExpr); // BasePhpValue
+            *code << code->InvokeVirtual(asObject); // PhpObject
+            *code << code->PushString(propName); // String
+            *code << code->InvokeVirtual(objGetProp); // BasePhpValue
+            return;
+        }
+
+        // ===== new Foo(a,b) =====
+        case ExprType::ET_NEW: {
+            const ExprNode *classNameExpr = nullptr;
+            const ExprNode *argsNode = nullptr;
+
+            if (expr->children.size() == 2) {
+                classNameExpr = childOrNull(expr, 0);
+                argsNode = childOrNull(expr, 1);
+            } else if (expr->children.size() == 1) {
+                // you have New(args) overload; without class name we can't resolve it safely yet
+                Console::Warning("ET_NEW: missing class name in AST (pushing NULL)");
+                *code << code->GetStatic(nullValueField);
+                return;
+            }
+
+            std::string className = idText(classNameExpr);
+            if (className.empty()) {
+                Console::Warning("ET_NEW: empty class name (pushing NULL)");
+                *code << code->GetStatic(nullValueField);
+                return;
+            }
+
+            *code << code->PushString(className);
+            emitArgsArray(root, method, code, argsNode);
+            *code << code->InvokeStatic(rtNewObject); // BasePhpValue (OBJECT)
+            return;
+        }
+
+        // ===== arrays: [] =====
+        case ExprType::ET_ARRAY_EMPTY: {
+            *code << code->InvokeStatic(arrFactory); // BasePhpValue array
+            return;
+        }
+
+        // ===== arrays: $arr[$k] =====
+        case ExprType::ET_ARRAY_INDEX: {
+            EmitValue(root, method, code, childOrNull(expr, 0)); // arr
+            EmitValue(root, method, code, childOrNull(expr, 1)); // key
+            *code << code->InvokeStatic(arrGet); // value
+            return;
+        }
+
+        // ===== arrays: [$k => $v] pair node (used inside list) =====
+        case ExprType::ET_ARRAY_KEY_ACCESS: {
+            // This node is usually handled by ET_ARRAY_ELEMENT_LIST,
+            // but if it appears alone, make a single-element array.
+            *code << code->InvokeStatic(arrFactory); // arr
+            *code << code->Duplicate(); // arr arr
+            EmitValue(root, method, code, childOrNull(expr, 0)); // arr arr key
+            EmitValue(root, method, code, childOrNull(expr, 1)); // arr arr key val
+            *code << code->InvokeStatic(arrSet); // arr
+            return;
+        }
+
+        // ===== arrays: element list =====
+        case ExprType::ET_ARRAY_ELEMENT_LIST: {
+            // children[0] is "elements" (often ET_EXPR_LIST)
+            const ExprNode *elements = childOrNull(expr, 0);
+
+            *code << code->InvokeStatic(arrFactory); // arr
+
+            std::vector<const ExprNode *> parts;
+            if (elements) {
+                if (elements->type == ExprType::ET_EXPR_LIST) {
+                    for (auto *ch: elements->children) if (ch) parts.push_back(ch);
+                } else {
+                    parts.push_back(elements);
+                }
+            }
+
+            for (auto *p: parts) {
+                if (!p) continue;
+
+                if (p->type == ExprType::ET_ARRAY_KEY_ACCESS) {
+                    *code << code->Duplicate(); // arr arr
+                    EmitValue(root, method, code, childOrNull(p, 0)); // key
+                    EmitValue(root, method, code, childOrNull(p, 1)); // val
+                    *code << code->InvokeStatic(arrSet); // arr
+                } else {
+                    *code << code->Duplicate(); // arr arr
+                    EmitValue(root, method, code, p); // arr arr val
+                    *code << code->InvokeStatic(arrAppend); // arr
+                }
+            }
+            return;
+        }
+
+        // ===== arrays: $arr[] = $v OR array_append expr node =====
+        case ExprType::ET_ARRAY_APPEND: {
+            EmitValue(root, method, code, childOrNull(expr, 0)); // arr
+            *code << code->Duplicate(); // arr arr
+            EmitValue(root, method, code, childOrNull(expr, 1)); // arr arr val
+            *code << code->InvokeStatic(arrAppend); // arr
+            return;
+        }
+
+        // ===== arrays: $arr[$k] = $v (your semantics rewrites ET_ASSIGN into this) =====
+        case ExprType::ET_ARRAY_ASSIGNMENT: {
+            EmitValue(root, method, code, childOrNull(expr, 0)); // arr
+            *code << code->Duplicate(); // arr arr
+            EmitValue(root, method, code, childOrNull(expr, 1)); // key
+            EmitValue(root, method, code, childOrNull(expr, 2)); // val
+            *code << code->InvokeStatic(arrSet); // arr
+            return;
+        }
+
+        // ===== ternary: cond ? a : b =====
+        case ExprType::ET_TERNARY: {
+            const ExprNode *cond = childOrNull(expr, 0);
+            const ExprNode *a = childOrNull(expr, 1);
+            const ExprNode *b = childOrNull(expr, 2);
+
+            auto *L_false = code->CodeLabel();
+            auto *L_end = code->CodeLabel();
+
+            EmitValue(root, method, code, cond); // BasePhpValue
+            *code << code->InvokeVirtual(toBool); // int(0/1)
+            *code << code->If(Instruction::Compare::Equal, L_false); // if 0 -> false
+
+            EmitValue(root, method, code, a);
+            *code << code->GoTo(L_end);
+
+            *code << L_false;
+            EmitValue(root, method, code, b);
+
+            *code << L_end;
+            return;
+        }
+
+        // ===== null coalescing: a ?? b =====
+        case ExprType::ET_NULL_COALESCING: {
+            const ExprNode *a = childOrNull(expr, 0);
+            const ExprNode *b = childOrNull(expr, 1);
+
+            auto *L_isNull = code->CodeLabel();
+            auto *L_end = code->CodeLabel();
+
+            EmitValue(root, method, code, a); // v
+            *code << code->Duplicate(); // v v
+            *code << code->InvokeVirtual(isNull); // v bool
+            *code << code->If(Instruction::Compare::NotEqual, L_isNull); // if true -> jump; pops bool; leaves v
+
+            // not null: keep v
+            *code << code->GoTo(L_end);
+
+            *code << L_isNull;
+            *code << code->PopOne(); // drop v (it is NULL)
+            EmitValue(root, method, code, b); // push b
+
+            *code << L_end;
+            return;
+        }
+
+        // ===== function call: foo(a,b) OR (new A)(args) =====
+        case ExprType::ET_FUNCTION_CALL: {
+            const ExprNode *fn = childOrNull(expr, 0);
+            const ExprNode *argsNode = childOrNull(expr, 1);
+
+            if (!fn) {
+                Console::Warning("ET_FUNCTION_CALL: missing callee (pushing NULL)");
+                *code << code->GetStatic(nullValueField);
+                return;
+            }
+
+            // ---- IMPORTANT: your AST encodes `new A()` as ET_FUNCTION_CALL(ET_NEW(A), args) ----
+            if (fn->type == ExprType::ET_NEW) {
+                // ET_NEW node in your tree often only has the class name (ET_ID "A")
+                // Args are on the ET_FUNCTION_CALL node.
+                const ExprNode *classNameExpr = childOrNull(fn, 0);
+                std::string className = idText(classNameExpr);
+
+                if (className.empty()) {
+                    Console::Warning("ET_FUNCTION_CALL(ET_NEW ...): empty class name (pushing NULL)");
+                    *code << code->GetStatic(nullValueField);
+                    return;
+                }
+
+                *code << code->PushString(className);
+                emitArgsArray(root, method, code, argsNode);
+                *code << code->InvokeStatic(rtNewObject); // BasePhpValue (OBJECT)
+                return;
+            }
+
+            // ---- normal global function call: foo(args) ----
+            std::string fnName = lowerCopy(idText(fn));
+            if (fnName.empty()) {
+                Console::Warning("ET_FUNCTION_CALL: missing function name (pushing NULL)");
+                *code << code->GetStatic(nullValueField);
+                return;
+            }
+
+            // convention: compile global functions as static methods on the program class:
+            //   static BasePhpValue foo(BasePhpValue[] args)
+            auto *callFn = root->getOrCreateMethodrefConstant(
+                root->getClassName(),
+                fnName,
+                DescriptorMethod(
+                    DescriptorField("com/phpjvm/BasePhpValue"),
+                    {DescriptorField("com/phpjvm/BasePhpValue", 1)} // BasePhpValue[]
+                )
+            );
+
+            emitArgsArray(root, method, code, argsNode); // BasePhpValue[]
+            *code << code->InvokeStatic(callFn); // BasePhpValue
+            return;
+        }
+
+        // ===== "and/or" lower-precedence tokens: map to same runtime helpers for now =====
+        case ExprType::ET_AND_LOWER: {
+            emitBinary(root, method, code, childOrNull(expr, 0), childOrNull(expr, 1), boolAnd,
+                       &ExprBuilder::EmitValue);
+            return;
+        }
+        case ExprType::ET_OR_LOWER: {
+            emitBinary(root, method, code, childOrNull(expr, 0), childOrNull(expr, 1), boolOr, &ExprBuilder::EmitValue);
+            return;
+        }
+
 
         default:
             Console::Warning("ExprBuilder::EmitValue not implemented for " + toString(expr->type) + " (pushing NULL)");

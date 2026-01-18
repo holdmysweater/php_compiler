@@ -1,5 +1,7 @@
 #include "ElementNode.h"
 #include "json.hpp"
+#include "jvm/descriptor-method.h"
+#include "jvm/method.h"
 
 using json = nlohmann::json;
 
@@ -132,14 +134,49 @@ Class *ElementNode::processClass(Class *root, std::vector<Class *> &list) {
     bool isOk = true;
 
     switch (type) {
-        case ElementType::ELEMENT_PROGRAM_LIST:
+        case ElementType::ELEMENT_PROGRAM_LIST: {
+            // 1) create main ONCE
+            Method *mainMethod = root->getOrCreateMethod(
+                "main",
+                DescriptorMethod(
+                    std::nullopt, // void
+                    {DescriptorField("java/lang/String", 1)} // String[] args
+                )
+            );
+            mainMethod->addFlag(Method::ACC_PUBLIC);
+            mainMethod->addFlag(Method::ACC_STATIC);
+
+            AttributeCode *code = mainMethod->getCodeAttribute();
+
+            // 2) emit everything into the same main
             for (auto child: children) {
-                root = child->processClass(root, list);
+                if (!child) continue;
+
+                switch (child->type) {
+                    case ElementType::ELEMENT_STATEMENT:
+                        if (child->stmt) child->stmt->addStmt(root, mainMethod, code, true);
+                        break;
+
+                    case ElementType::ELEMENT_CLASS_DECL:
+                    case ElementType::ELEMENT_FUNC_DECL:
+                        if (child->decl) child->decl->processClass(root, list);
+                        break;
+
+                    default:
+                        root = child->processClass(root, list);
+                        break;
+                }
             }
+
+            // 3) return once at the end
+            *code << code->ReturnVoid();
             break;
+        }
+
         case ElementType::ELEMENT_STATEMENT:
-            this->stmt->processClass(root, list);
+            // Top-level statements are handled by ELEMENT_PROGRAM_LIST now
             break;
+
         case ElementType::ELEMENT_CLASS_DECL:
         case ElementType::ELEMENT_FUNC_DECL:
             this->decl->processClass(root, list);

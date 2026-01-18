@@ -46,7 +46,7 @@ public:
 
     Class *processClass(Class *root, std::vector<Class *> &list) override;
 
-    AttributeCode *addStmt(Class *root, Method *method, AttributeCode *code) const;
+    AttributeCode *addStmt(Class *root, Method *method, AttributeCode *code, bool isMain = false) const;
 
     // List
     static StmtNode *StmtList(StmtNode *stmt);
