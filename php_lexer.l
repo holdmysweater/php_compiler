@@ -501,6 +501,7 @@ FINALLY     [Ff][Ii][Nn][Aa][Ll][Ll][Yy]
                             return ']';
                         }
 
+<PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>\$PHP_EOL   { logSigilAndPushId(yytext+1, "PHP_EOL"); return '$'; }
 <PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>\${ARRAY}   { logSigilAndPushId(yytext+1, "ARRAY"); return '$'; }
 <PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>\${ENDFOREACH}   { logSigilAndPushId(yytext+1, "ENDFOREACH"); return '$'; }
 <PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>\${ENDWHILE}   { logSigilAndPushId(yytext+1, "ENDWHILE"); return '$'; }
@@ -555,6 +556,7 @@ FINALLY     [Ff][Ii][Nn][Aa][Ll][Ll][Yy]
 <PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>\${FALSE}   { logSigilAndPushId(yytext+1, "FALSE"); return '$'; }
 <PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>\${NULL}   { logSigilAndPushId(yytext+1, "NULL"); return '$'; }
 
+<PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>PHP_EOL     { Console::LexLog(yylineno, yytext, "keyword PHP_EOL"); yylval.string_const = new std::string("\n"); return STRING; }
 <PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>{ARRAY}     { Console::LexLog(yylineno, yytext, "keyword ARRAY"); return ARRAY; }
 <PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>{ENDFOREACH}   { Console::LexLog(yylineno, yytext, "keyword ENDFOREACH"); return ENDFOREACH; }
 <PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>{ENDWHILE}     { Console::LexLog(yylineno, yytext, "keyword ENDWHILE"); return ENDWHILE; }
