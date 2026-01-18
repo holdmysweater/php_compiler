@@ -3,8 +3,95 @@
 #include "json.hpp"
 #include <string>
 #include <cctype>
+#include "jvm/class.h"
+#include "jvm/method.h"
+#include "jvm/attribute-code.h"
+#include "jvm/descriptor-field.h"
+#include "jvm/descriptor-method.h"
 
 using json = nlohmann::json;
+using namespace jvm;
+
+static std::string toLowerAscii(std::string s) {
+    for (char &c: s) c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
+    return s;
+}
+
+// PHP namespaces '\' -> JVM '/' and make it case-insensitive like PHP classes
+static std::string toJvmInternalName(std::string s) {
+    s = toLowerAscii(s);
+    for (char &c: s) {
+        if (c == '\\') c = '/';
+    }
+    while (!s.empty() && s.front() == '/') s.erase(s.begin());
+    return s;
+}
+
+static DescriptorMethod descPhpFunction() {
+    // BasePhpValue f(BasePhpValue[] args)
+    return DescriptorMethod(
+        DescriptorField("com/phpjvm/BasePhpValue"),
+        {DescriptorField("com/phpjvm/BasePhpValue", 1)} // BasePhpValue[]
+    );
+}
+
+static DescriptorMethod descPhpInstanceMethod() {
+    // BasePhpValue m(PhpObject self, BasePhpValue[] args)
+    return DescriptorMethod(
+        DescriptorField("com/phpjvm/BasePhpValue"),
+        {DescriptorField("com/phpjvm/PhpObject"), DescriptorField("com/phpjvm/BasePhpValue", 1)}
+    );
+}
+
+static DescriptorMethod descPhpStaticMethod() {
+    // BasePhpValue m(PhpClass calledClass, BasePhpValue[] args)
+    return DescriptorMethod(
+        DescriptorField("com/phpjvm/BasePhpValue"),
+        {DescriptorField("com/phpjvm/PhpClass"), DescriptorField("com/phpjvm/BasePhpValue", 1)}
+    );
+}
+
+static void emitDefaultCtor(Class *cls) {
+    Method *init = cls->getOrCreateMethod("<init>", DescriptorMethod(std::nullopt, {}));
+    init->addFlag(Method::ACC_PUBLIC);
+
+    AttributeCode *code = init->getCodeAttribute();
+
+    auto *superInit = cls->getOrCreateMethodrefConstant(
+        "java/lang/Object",
+        "<init>",
+        DescriptorMethod(std::nullopt, {})
+    );
+
+    *code << code->LoadReference(0);
+    *code << code->InvokeSpecial(superInit);
+    *code << code->ReturnVoid();
+}
+
+static void emitReturnNull(Class *root, AttributeCode *code) {
+    auto *nullValueField = root->getOrCreateFieldrefConstant(
+        "com/phpjvm/BasePhpValue",
+        "NULL_VALUE",
+        DescriptorField("com/phpjvm/BasePhpValue")
+    );
+
+    *code << code->GetStatic(nullValueField);
+    *code << code->ReturnReference();
+}
+
+static void applyVisibility(Method *m, VisibilityType vis) {
+    // remove nothing; just add what you want (your builder likely enforces "only one")
+    switch (vis) {
+        case VISIBILITY_PUBLIC: m->addFlag(Method::ACC_PUBLIC);
+            break;
+        case VISIBILITY_PRIVATE: m->addFlag(Method::ACC_PRIVATE);
+            break;
+        case VISIBILITY_PROTECTED: m->addFlag(Method::ACC_PROTECTED);
+            break;
+        default: m->addFlag(Method::ACC_PUBLIC);
+            break;
+    }
+}
 
 string DeclNode::_getClassName() const {
     return "DeclNode";
@@ -239,6 +326,93 @@ Class *DeclNode::processClass(Class *root, std::vector<Class *> &list) {
     bool isOk = true;
 
     switch (type) {
+        case DT_LIST: {
+            for (auto *child: children) {
+                if (child) root = child->processClass(root, list);
+            }
+            break;
+        }
+
+        case DT_CLASS: {
+            // Create a brand-new JVM class for the PHP class
+            std::string clsName = toJvmInternalName(name);
+            std::string parentName = classNameExtended.empty()
+                                         ? "java/lang/Object"
+                                         : toJvmInternalName(classNameExtended);
+
+            auto *cls = new Class(clsName, parentName);
+            cls->addFlag(Class::ACC_PUBLIC);
+            cls->addFlag(Class::ACC_SUPER);
+
+            emitDefaultCtor(cls);
+
+            // Generate members into this class (methods/props/consts)
+            if (declList) {
+                declList->processClass(cls, list);
+            }
+
+            // Important: add generated class to output list
+            list.push_back(cls);
+
+            // Keep compiling in the original root class (top-level)
+            break;
+        }
+
+        case DT_FUNCTION: {
+            // Generate a static Java method on the current root class:
+            // BasePhpValue name(BasePhpValue[] args)
+            std::string fn = toLowerAscii(name);
+
+            Method *m = root->getOrCreateMethod(fn, descPhpFunction());
+            m->addFlag(Method::ACC_PUBLIC);
+            m->addFlag(Method::ACC_STATIC);
+
+            AttributeCode *code = m->getCodeAttribute();
+
+            // Compile body using your statement emitter (NOT StmtNode::processClass which hardcodes main)
+            if (stmt) {
+                stmt->addStmt(root, m, code);
+            }
+
+            // Default return NULL (until you fully implement ST_RETURN everywhere)
+            emitReturnNull(root, code);
+            break;
+        }
+
+        case DT_METHOD: {
+            // Compile PHP methods into the current class as Java static methods.
+            // Instance: BasePhpValue m(PhpObject self, BasePhpValue[] args)
+            // Static:   BasePhpValue m(PhpClass calledClass, BasePhpValue[] args)
+            std::string mn = toLowerAscii(name);
+
+            const bool phpStatic = (isStatic == 1);
+            DescriptorMethod sig = phpStatic ? descPhpStaticMethod() : descPhpInstanceMethod();
+
+            Method *m = root->getOrCreateMethod(mn, sig);
+
+            applyVisibility(m, visibilityType);
+
+            // Keep it Java-static so runtime adapters can call it easily later
+            m->addFlag(Method::ACC_STATIC);
+
+            AttributeCode *code = m->getCodeAttribute();
+
+            if (stmt) {
+                stmt->addStmt(root, m, code);
+            }
+
+            emitReturnNull(root, code);
+            break;
+        }
+
+        case DT_PROPERTY:
+        case DT_CONSTANT:
+        case DT_PARAMETER:
+            // You can add bytecode for properties/consts later (usually backing fields + init)
+            Warn("DeclNode::processClass: " + toString(type) + " not implemented yet");
+            break;
+
+        case DT_UNKNOWN:
         default:
             Warn("no processing implementation for " + toString(type));
             break;
