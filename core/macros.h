@@ -3,6 +3,7 @@
 
 
 /* IMPORTANT */
+// #define DISABLE_ALL_LOGS
 
 /* System debug */
 #define CONSOLE_SYSTEM_LOG_ENABLED

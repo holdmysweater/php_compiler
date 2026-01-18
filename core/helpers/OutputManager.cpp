@@ -7,8 +7,8 @@
 
 
 struct EmbeddedClassFile {
-    const char* relPath;
-    const unsigned char* bytes;
+    const char *relPath;
+    const unsigned char *bytes;
     unsigned int len;
 };
 
@@ -18,7 +18,16 @@ static const EmbeddedClassFile kPhpRuntimeFiles[] = {
     {"com/phpjvm/BasePhpValue$PhpKey$K.class", BasePhpValue_PhpKey_K_class, BasePhpValue_PhpKey_K_class_len},
     {"com/phpjvm/BasePhpValue$PhpKey.class", BasePhpValue_PhpKey_class, BasePhpValue_PhpKey_class_len},
     {"com/phpjvm/BasePhpValue$PhpNumber.class", BasePhpValue_PhpNumber_class, BasePhpValue_PhpNumber_class_len},
-    {"com/phpjvm/BasePhpValue$PhpRuntimeException.class", BasePhpValue_PhpRuntimeException_class, BasePhpValue_PhpRuntimeException_class_len},
+    {
+        "com/phpjvm/BasePhpValue$PhpRuntimeException.class",
+        BasePhpValue_PhpRuntimeException_class,
+        BasePhpValue_PhpRuntimeException_class_len
+    },
+    {
+        "com/phpjvm/BasePhpValue$PhpTypeError.class",
+        BasePhpValue_PhpTypeError_class,
+        BasePhpValue_PhpTypeError_class_len
+    },
     {"com/phpjvm/BasePhpValue$Type.class", BasePhpValue_Type_class, BasePhpValue_Type_class_len},
 };
 static const std::size_t kPhpRuntimeFilesCount = sizeof(kPhpRuntimeFiles) / sizeof(kPhpRuntimeFiles[0]);
@@ -143,14 +152,14 @@ void OutputManager::EnsureEmbeddedPhpRuntime() {
 
     try {
         for (std::size_t i = 0; i < kPhpRuntimeFilesCount; i++) {
-            const auto& f = kPhpRuntimeFiles[i];
+            const auto &f = kPhpRuntimeFiles[i];
 
             fs::path outPath = outputDir / fs::path(f.relPath);
 
             WriteBytesToFile(outPath, f.bytes, f.len);
             Console::SystemLog(std::string("Runtime ensured: '") + outPath.string() + "'");
         }
-    } catch (const std::exception& e) {
+    } catch (const std::exception &e) {
         Console::SystemError(std::string("Failed to ensure runtime classes: ") + e.what());
         throw;
     }

@@ -63,6 +63,7 @@ void ByteCodeHelper::VerboseFile(const string &baseName) {
 
     Console::SystemLog(cmd);
 
+#ifndef DISABLE_ALL_LOGS
     if (system(cmd.c_str()) != 0) {
         Console::SystemError("Bytecode verbose failed!");
         return;
@@ -70,6 +71,7 @@ void ByteCodeHelper::VerboseFile(const string &baseName) {
 
     cmd += " > " + Config::GetOutputDir().string() + "output_verbose.txt";
     system(cmd.c_str());
+#endif
 
     Console::SystemLog("Bytecode verbose successful!");
 }
@@ -79,7 +81,7 @@ void ByteCodeHelper::ExecuteFile(const string &baseName) {
     std::string cmd;
     Console::SystemLog("Executing bytecode...");
 
-    cmd = "java -cp \"" + Config::GetOutputDir().string() + "\\\" " + baseName;
+    cmd = "java -cp " + Config::GetOutputDir().string() + " " + baseName;
 
     Console::SystemLog(cmd);
 
