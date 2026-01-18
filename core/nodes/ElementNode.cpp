@@ -134,6 +134,7 @@ Class *ElementNode::processClass(Class *root, std::vector<Class *> &list) {
     bool isOk = true;
 
     switch (type) {
+        case ElementType::ELEMENT_EMPTY:
         case ElementType::ELEMENT_PROGRAM_LIST: {
             // 1) create main ONCE
             Method *mainMethod = root->getOrCreateMethod(
