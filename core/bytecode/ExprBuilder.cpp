@@ -107,6 +107,13 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
     if (!method) throw std::logic_error("ExprBuilder::EmitValue: method is null");
     if (!code) throw std::logic_error("ExprBuilder::EmitValue: code is null");
 
+    if (expr->type == ExprType::ET_EXPR_LIST) {
+        for (auto child: expr->children) {
+            EmitValue(root, method, code, child);
+        }
+        return;
+    }
+
     // ---------- Runtime symbols ----------
     auto *nullValueField = root->getOrCreateFieldrefConstant(
         "com/phpjvm/BasePhpValue",
