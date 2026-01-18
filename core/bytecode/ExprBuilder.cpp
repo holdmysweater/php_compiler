@@ -10,47 +10,36 @@
 
 using namespace jvm;
 
-static std::string floatToString(float v) {
-    std::ostringstream ss;
-    ss << std::setprecision(15) << v;
-    std::string s = ss.str();
-    if (s.find('.') != std::string::npos) {
-        while (!s.empty() && s.back() == '0') s.pop_back();
-        if (!s.empty() && s.back() == '.') s.pop_back();
-    }
-    return s;
-}
-
-static const ExprNode* childOrNull(const ExprNode* e, size_t i) {
+static const ExprNode *childOrNull(const ExprNode *e, size_t i) {
     if (!e) return nullptr;
     if (i >= e->children.size()) return nullptr;
     return e->children[i];
 }
 
 static void emitBinary(
-    Class* root,
-    Method* method,
-    AttributeCode* code,
-    const ExprNode* left,
-    const ExprNode* right,
-    ConstantMethodref* op,
-    void (*emitValue)(Class*, Method*, AttributeCode*, const ExprNode*)
+    Class *root,
+    Method *method,
+    AttributeCode *code,
+    const ExprNode *left,
+    const ExprNode *right,
+    ConstantMethodref *op,
+    void (*emitValue)(Class *, Method *, AttributeCode *, const ExprNode *)
 ) {
-    emitValue(root, method, code, left);   // push BasePhpValue
-    emitValue(root, method, code, right);  // push BasePhpValue
-    *code << code->InvokeStatic(op);       // pop2 push1
+    emitValue(root, method, code, left); // push BasePhpValue
+    emitValue(root, method, code, right); // push BasePhpValue
+    *code << code->InvokeStatic(op); // pop2 push1
 }
 
 static void emitUnary(
-    Class* root,
-    Method* method,
-    AttributeCode* code,
-    const ExprNode* operand,
-    ConstantMethodref* op,
-    void (*emitValue)(Class*, Method*, AttributeCode*, const ExprNode*)
+    Class *root,
+    Method *method,
+    AttributeCode *code,
+    const ExprNode *operand,
+    ConstantMethodref *op,
+    void (*emitValue)(Class *, Method *, AttributeCode *, const ExprNode *)
 ) {
     emitValue(root, method, code, operand); // push BasePhpValue
-    *code << code->InvokeStatic(op);        // pop1 push1
+    *code << code->InvokeStatic(op); // pop1 push1
 }
 
 void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, const ExprNode *expr) {
@@ -71,6 +60,33 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
         DescriptorMethod(
             DescriptorField("com/phpjvm/BasePhpValue"),
             {DescriptorField("java/lang/String")}
+        )
+    );
+
+    auto *ofBool = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/BasePhpValue",
+        "of",
+        DescriptorMethod(
+            DescriptorField("com/phpjvm/BasePhpValue"),
+            {DescriptorField("Z")} // boolean
+        )
+    );
+
+    auto *ofLong = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/BasePhpValue",
+        "of",
+        DescriptorMethod(
+            DescriptorField("com/phpjvm/BasePhpValue"),
+            {DescriptorField("J")} // long
+        )
+    );
+
+    auto *ofDouble = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/BasePhpValue",
+        "of",
+        DescriptorMethod(
+            DescriptorField("com/phpjvm/BasePhpValue"),
+            {DescriptorField("D")} // double
         )
     );
 
@@ -240,23 +256,23 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
         }
 
         case ExprType::ET_INT: {
-            int v = (expr->value ? expr->value->intValue : 0);
-            *code << code->PushString(std::to_string(v));
-            *code << code->InvokeStatic(ofString);
+            int64_t v = (expr->value ? (int64_t) expr->value->intValue : 0);
+            *code << code->PushLong(v);
+            *code << code->InvokeStatic(ofLong);
             return;
         }
 
         case ExprType::ET_FLOAT: {
-            float v = (expr->value ? expr->value->floatValue : 0.0f);
-            *code << code->PushString(floatToString(v));
-            *code << code->InvokeStatic(ofString);
+            double v = (expr->value ? (double) expr->value->floatValue : 0.0);
+            *code << code->PushDouble(v);
+            *code << code->InvokeStatic(ofDouble);
             return;
         }
 
         case ExprType::ET_BOOL: {
             bool v = (expr->value ? expr->value->boolValue : false);
-            *code << code->PushString(v ? "1" : "");
-            *code << code->InvokeStatic(ofString);
+            *code << code->PushInt(v ? 1 : 0);
+            *code << code->InvokeStatic(ofBool);
             return;
         }
 
@@ -267,7 +283,7 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
 
         // ===== parentheses =====
         case ExprType::ET_PARENTHESIZED: {
-            const ExprNode* inner = childOrNull(expr, 0);
+            const ExprNode *inner = childOrNull(expr, 0);
             EmitValue(root, method, code, inner);
             return;
         }
@@ -282,9 +298,9 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
 
             const ExprNode *args = expr->children[0];
 
-            std::vector<const ExprNode*> parts;
+            std::vector<const ExprNode *> parts;
             if (args->type == ExprType::ET_EXPR_LIST) {
-                for (auto *p : args->children) {
+                for (auto *p: args->children) {
                     if (p) parts.push_back(p);
                 }
             } else {
@@ -307,81 +323,85 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
 
         // ===== arithmetic =====
         case ExprType::ET_ADD: {
-            emitBinary(root, method, code, childOrNull(expr,0), childOrNull(expr,1), add, &ExprBuilder::EmitValue);
+            emitBinary(root, method, code, childOrNull(expr, 0), childOrNull(expr, 1), add, &ExprBuilder::EmitValue);
             return;
         }
         case ExprType::ET_SUBTRACT: {
-            emitBinary(root, method, code, childOrNull(expr,0), childOrNull(expr,1), sub, &ExprBuilder::EmitValue);
+            emitBinary(root, method, code, childOrNull(expr, 0), childOrNull(expr, 1), sub, &ExprBuilder::EmitValue);
             return;
         }
         case ExprType::ET_MULT: {
-            emitBinary(root, method, code, childOrNull(expr,0), childOrNull(expr,1), mul, &ExprBuilder::EmitValue);
+            emitBinary(root, method, code, childOrNull(expr, 0), childOrNull(expr, 1), mul, &ExprBuilder::EmitValue);
             return;
         }
         case ExprType::ET_DIV: {
-            emitBinary(root, method, code, childOrNull(expr,0), childOrNull(expr,1), div, &ExprBuilder::EmitValue);
+            emitBinary(root, method, code, childOrNull(expr, 0), childOrNull(expr, 1), div, &ExprBuilder::EmitValue);
             return;
         }
         case ExprType::ET_MOD: {
-            emitBinary(root, method, code, childOrNull(expr,0), childOrNull(expr,1), mod, &ExprBuilder::EmitValue);
+            emitBinary(root, method, code, childOrNull(expr, 0), childOrNull(expr, 1), mod, &ExprBuilder::EmitValue);
             return;
         }
 
         // ===== string concat "." =====
         case ExprType::ET_CONCAT: {
-            emitBinary(root, method, code, childOrNull(expr,0), childOrNull(expr,1), concat, &ExprBuilder::EmitValue);
+            emitBinary(root, method, code, childOrNull(expr, 0), childOrNull(expr, 1), concat, &ExprBuilder::EmitValue);
             return;
         }
 
         // ===== comparisons =====
         case ExprType::ET_EQUAL: {
-            emitBinary(root, method, code, childOrNull(expr,0), childOrNull(expr,1), eq, &ExprBuilder::EmitValue);
+            emitBinary(root, method, code, childOrNull(expr, 0), childOrNull(expr, 1), eq, &ExprBuilder::EmitValue);
             return;
         }
         case ExprType::ET_NOT_EQUAL: {
-            emitBinary(root, method, code, childOrNull(expr,0), childOrNull(expr,1), ne, &ExprBuilder::EmitValue);
+            emitBinary(root, method, code, childOrNull(expr, 0), childOrNull(expr, 1), ne, &ExprBuilder::EmitValue);
             return;
         }
         case ExprType::ET_IDENTICALLY_EQUAL: {
-            emitBinary(root, method, code, childOrNull(expr,0), childOrNull(expr,1), identical, &ExprBuilder::EmitValue);
+            emitBinary(root, method, code, childOrNull(expr, 0), childOrNull(expr, 1), identical,
+                       &ExprBuilder::EmitValue);
             return;
         }
         case ExprType::ET_IDENTICALLY_NOT_EQUAL: {
-            emitBinary(root, method, code, childOrNull(expr,0), childOrNull(expr,1), notIdentical, &ExprBuilder::EmitValue);
+            emitBinary(root, method, code, childOrNull(expr, 0), childOrNull(expr, 1), notIdentical,
+                       &ExprBuilder::EmitValue);
             return;
         }
         case ExprType::ET_LESS_THAN: {
-            emitBinary(root, method, code, childOrNull(expr,0), childOrNull(expr,1), lt, &ExprBuilder::EmitValue);
+            emitBinary(root, method, code, childOrNull(expr, 0), childOrNull(expr, 1), lt, &ExprBuilder::EmitValue);
             return;
         }
         case ExprType::ET_LESS_OR_EQUAL: {
-            emitBinary(root, method, code, childOrNull(expr,0), childOrNull(expr,1), le, &ExprBuilder::EmitValue);
+            emitBinary(root, method, code, childOrNull(expr, 0), childOrNull(expr, 1), le, &ExprBuilder::EmitValue);
             return;
         }
         case ExprType::ET_GREATER_THAN: {
-            emitBinary(root, method, code, childOrNull(expr,0), childOrNull(expr,1), gt, &ExprBuilder::EmitValue);
+            emitBinary(root, method, code, childOrNull(expr, 0), childOrNull(expr, 1), gt, &ExprBuilder::EmitValue);
             return;
         }
         case ExprType::ET_GREAT_OR_EQUAL: {
-            emitBinary(root, method, code, childOrNull(expr,0), childOrNull(expr,1), ge, &ExprBuilder::EmitValue);
+            emitBinary(root, method, code, childOrNull(expr, 0), childOrNull(expr, 1), ge, &ExprBuilder::EmitValue);
             return;
         }
         case ExprType::ET_SPACESHIP: {
-            emitBinary(root, method, code, childOrNull(expr,0), childOrNull(expr,1), spaceship, &ExprBuilder::EmitValue);
+            emitBinary(root, method, code, childOrNull(expr, 0), childOrNull(expr, 1), spaceship,
+                       &ExprBuilder::EmitValue);
             return;
         }
 
         // ===== boolean ops (truthiness) =====
         case ExprType::ET_NOT: {
-            emitUnary(root, method, code, childOrNull(expr,0), boolNot, &ExprBuilder::EmitValue);
+            emitUnary(root, method, code, childOrNull(expr, 0), boolNot, &ExprBuilder::EmitValue);
             return;
         }
         case ExprType::ET_AND: {
-            emitBinary(root, method, code, childOrNull(expr,0), childOrNull(expr,1), boolAnd, &ExprBuilder::EmitValue);
+            emitBinary(root, method, code, childOrNull(expr, 0), childOrNull(expr, 1), boolAnd,
+                       &ExprBuilder::EmitValue);
             return;
         }
         case ExprType::ET_OR: {
-            emitBinary(root, method, code, childOrNull(expr,0), childOrNull(expr,1), boolOr, &ExprBuilder::EmitValue);
+            emitBinary(root, method, code, childOrNull(expr, 0), childOrNull(expr, 1), boolOr, &ExprBuilder::EmitValue);
             return;
         }
 

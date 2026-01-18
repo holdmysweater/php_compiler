@@ -8,6 +8,10 @@
 using namespace jvm;
 
 void StmtBuilder::EmitEcho(Class *root, Method *method, AttributeCode *code, ExprNode *expr) {
+    if (!root) throw std::logic_error("StmtBuilder::EmitEcho: root is null");
+    if (!method) throw std::logic_error("StmtBuilder::EmitEcho: method is null");
+    if (!code) throw std::logic_error("StmtBuilder::EmitEcho: code is null");
+
     auto *systemOut = root->getOrCreateFieldrefConstant(
         "java/lang/System",
         "out",
@@ -34,14 +38,14 @@ void StmtBuilder::EmitEcho(Class *root, Method *method, AttributeCode *code, Exp
     );
 
     // Stack:
-    // getstatic out                -> [PrintStream]
-    // EmitValue(expr)              -> [PrintStream, BasePhpValue]
-    // invokevirtual toPhpString    -> [PrintStream, String]
-    // invokevirtual print(String)  -> []
-    *code << code->GetStatic(systemOut);
-
-    ExprBuilder::EmitValue(root, method, code, expr);
-
-    *code << code->InvokeVirtual(toPhpString);
-    *code << code->InvokeVirtual(print);
+    // EmitValue(expr)                   -> [BasePhpValue]
+    // invokevirtual toPhpString         -> [String]
+    // getstatic System.out              -> [String, PrintStream]
+    // swap                              -> [PrintStream, String]
+    // invokevirtual print(String)       -> []
+    ExprBuilder::EmitValue(root, method, code, expr); // push BasePhpValue
+    *code << code->InvokeVirtual(toPhpString); // pop BasePhpValue, push String
+    *code << code->GetStatic(systemOut); // push PrintStream
+    *code << code->Swap(); // reorder to [PrintStream, String]
+    *code << code->InvokeVirtual(print); // consume both
 }
