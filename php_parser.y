@@ -168,6 +168,7 @@ expression : expression LOGIC_OR expression                 { Console::ParserLog
           | expression PROPERTY_ACCESS expression_variable  { Console::ParserLog("expression (expression PROPERTY_ACCESS expression)"); $$ = ExprNode::PropertyAccess($1, $3); }
           | expression PROPERTY_ACCESS expression_variable '(' expression_list_empty ')'    { Console::ParserLog("expression (expression PROPERTY_ACCESS expression_variable '(' expression_list_empty ')')"); $$ = ExprNode::MethodAccess($1, $3, $5); }
           | expression STATIC_PROPERTY_ACCESS expression_variable    { Console::ParserLog("expression (expression STATIC_PROPERTY_ACCESS expression)"); $$ = ExprNode::StaticPropertyAccess($1, $3); }
+          | STATIC STATIC_PROPERTY_ACCESS expression_variable    { Console::ParserLog("expression (STATIC STATIC_PROPERTY_ACCESS expression_variable)"); $$ = ExprNode::StaticStaticPropertyAccess($3); }
           | expression INCREMENT                            { Console::ParserLog("expression (expression INCREMENT)"); $$ = ExprNode::IncrementPost($1); }
           | expression DECREMENT                            { Console::ParserLog("expression (expression DECREMENT)"); $$ = ExprNode::DecrementPost($1); }
           | INCREMENT expression                            { Console::ParserLog("expression (INCREMENT expression)"); $$ = ExprNode::IncrementPre($2); }

@@ -615,6 +615,15 @@ ExprNode *ExprNode::StaticPropertyAccess(ExprNode *left, ExprNode *right) {
     return node;
 }
 
+ExprNode *ExprNode::StaticStaticPropertyAccess(ExprNode *right) {
+    auto node = new ExprNode();
+    node->type = ExprType::ET_STATIC_PROPERTY_ACCESS;
+    node->children.push_back(ExprNode::Id(new string("static")));
+    node->children.push_back(right);
+    node->WriteToFiles();
+    return node;
+}
+
 ExprNode *ExprNode::ArrayIndex(ExprNode *array, ExprNode *index) {
     auto node = new ExprNode();
     node->type = ExprType::ET_ARRAY_INDEX;

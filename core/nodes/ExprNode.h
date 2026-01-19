@@ -124,6 +124,8 @@ public:
 
     static ExprNode *StaticPropertyAccess(ExprNode *left, ExprNode *right);
 
+    static ExprNode *StaticStaticPropertyAccess(ExprNode *right);
+
     static ExprNode *ArrayIndex(ExprNode *array, ExprNode *index);
 
     static ExprNode *ArrayKeyAccess(ExprNode *key, ExprNode *value);
