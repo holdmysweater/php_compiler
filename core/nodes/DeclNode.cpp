@@ -589,23 +589,41 @@ Class *DeclNode::processClass(Class *root, std::vector<Class *> &list) {
 
             AttributeCode *code = m->getCodeAttribute();
 
-            // args in slot 0, params from slot 1 (with extra slots for by-ref descriptors)
+            // Bind args in slot 0, locals start at slot 1 (and SetByRefLayout is done inside).
             emitBindParamsFromArgs(root, m, code, params, fn, /*argsSlot*/0, /*baseLocalSlot*/1);
 
+            // Allocate one local for the return value and set up a shared epilogue.
+            uint16_t retSlot = ExprBuilder::AllocTempLocal(m);
+            auto *L_epilogue = code->CodeLabel();
+
+            auto *nullValueField = root->getOrCreateFieldrefConstant(
+                "com/phpjvm/BasePhpValue",
+                "NULL_VALUE",
+                DescriptorField("com/phpjvm/BasePhpValue")
+            );
+
+            // Default return is NULL_VALUE (PHP fall-through).
+            *code << code->GetStatic(nullValueField);
+            *code << code->StoreReference(retSlot);
+
+            // Make all "return expr;" store into retSlot and jump to L_epilogue.
+            StmtNode::BeginReturnCtx(m, L_epilogue, retSlot);
+
             if (stmt) {
-                stmt->addStmt(root, m, code);
+                stmt->addStmt(root, m, code, /*isMain*/false);
             }
 
-            // Copy-out by-ref params (works for your example even with no explicit return)
-            emitFlushByRefParams(root, m, code, params, /*baseLocalSlot*/1);
+            StmtNode::EndReturnCtx(m);
 
-            if (hasAnyByRefParam(params)) {
-                uint16_t slot = firstByRefValueSlot(params, /*baseLocalSlot*/1);
-                *code << code->LoadReference(slot);
-                *code << code->ReturnReference();
-            } else {
-                emitReturnNull(root, code);
-            }
+            // If body falls through (no explicit return), go to epilogue.
+            *code << code->GoTo(L_epilogue);
+
+            // Epilogue: flush by-ref params, then return retSlot.
+            *code << L_epilogue;
+            ExprBuilder::EmitFlushByRefIfNeeded(root, m, code);
+
+            *code << code->LoadReference(retSlot);
+            *code << code->ReturnReference();
 
             ExprBuilder::EndLocalScope(m);
             break;
@@ -614,7 +632,6 @@ Class *DeclNode::processClass(Class *root, std::vector<Class *> &list) {
         case DT_METHOD: {
             std::string mn = toLowerAscii(name);
 
-            // Key methods as "class::method" (lowercased) for call-site checks later (optional)
             std::string owner = toLowerAscii(root->getClassName());
             ExprBuilder::RegisterMethodSignature(owner, mn, params, valueType);
 
@@ -622,28 +639,41 @@ Class *DeclNode::processClass(Class *root, std::vector<Class *> &list) {
             DescriptorMethod sig = phpStatic ? descPhpStaticMethod() : descPhpInstanceMethod();
 
             Method *m = root->getOrCreateMethod(mn, sig);
-
             applyVisibility(m, visibilityType);
             m->addFlag(Method::ACC_STATIC);
 
             AttributeCode *code = m->getCodeAttribute();
 
-            // args is in slot 1, params from slot 2
+            // args is in slot 1, locals start at slot 2
             emitBindParamsFromArgs(root, m, code, params, owner + "::" + mn, /*argsSlot*/1, /*baseLocalSlot*/2);
 
+            uint16_t retSlot = ExprBuilder::AllocTempLocal(m);
+            auto *L_epilogue = code->CodeLabel();
+
+            auto *nullValueField = root->getOrCreateFieldrefConstant(
+                "com/phpjvm/BasePhpValue",
+                "NULL_VALUE",
+                DescriptorField("com/phpjvm/BasePhpValue")
+            );
+
+            *code << code->GetStatic(nullValueField);
+            *code << code->StoreReference(retSlot);
+
+            StmtNode::BeginReturnCtx(m, L_epilogue, retSlot);
+
             if (stmt) {
-                stmt->addStmt(root, m, code);
+                stmt->addStmt(root, m, code, /*isMain*/false);
             }
 
-            emitFlushByRefParams(root, m, code, params, /*baseLocalSlot*/2);
+            StmtNode::EndReturnCtx(m);
 
-            if (hasAnyByRefParam(params)) {
-                uint16_t slot = firstByRefValueSlot(params, /*baseLocalSlot*/2);
-                *code << code->LoadReference(slot);
-                *code << code->ReturnReference();
-            } else {
-                emitReturnNull(root, code);
-            }
+            *code << code->GoTo(L_epilogue);
+
+            *code << L_epilogue;
+            ExprBuilder::EmitFlushByRefIfNeeded(root, m, code);
+
+            *code << code->LoadReference(retSlot);
+            *code << code->ReturnReference();
 
             ExprBuilder::EndLocalScope(m);
             break;

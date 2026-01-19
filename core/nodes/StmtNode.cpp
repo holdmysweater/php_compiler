@@ -783,6 +783,14 @@ AttributeCode *StmtNode::addStmt(Class *root, Method *method, AttributeCode *cod
     }
 }
 
+void StmtNode::BeginReturnCtx(jvm::Method *method, jvm::Label *L_epilogue, uint16_t retSlot) {
+    setReturnCtx(method, L_epilogue, retSlot);
+}
+
+void StmtNode::EndReturnCtx(jvm::Method *method) {
+    clearReturnCtx(method);
+}
+
 // List
 StmtNode *StmtNode::StmtList(StmtNode *stmt) {
     auto node = new StmtNode();

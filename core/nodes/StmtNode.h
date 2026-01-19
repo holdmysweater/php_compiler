@@ -48,6 +48,13 @@ public:
 
     AttributeCode *addStmt(Class *root, Method *method, AttributeCode *code, bool isMain = false) const;
 
+    // ------------------------------------------------------------
+    // Function/method return epilogue support
+    // ------------------------------------------------------------
+    static void BeginReturnCtx(jvm::Method *method, jvm::Label *L_epilogue, uint16_t retSlot);
+
+    static void EndReturnCtx(jvm::Method *method);
+
     // List
     static StmtNode *StmtList(StmtNode *stmt);
 
