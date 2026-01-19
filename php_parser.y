@@ -345,9 +345,13 @@ parameter_function_list : parameter_function                        { Console::P
                    ;
 
 parameter_function : '$' ID                         { Console::ParserLog("parameter_function ('$' ID)"); $$ = DeclNode::ParamDecl($2); }
+                | '&' '$' ID                        { Console::ParserLog("parameter_function ('$' ID)"); $$ = DeclNode::ParamDeclWithAddressOp($3); }
                 | '$' ID '=' expression             { Console::ParserLog("parameter_function ('$' ID '=' expression)"); $$ = DeclNode::ParamDeclExpr($2, $4); }
+                | '&' '$' ID '=' expression         { Console::ParserLog("parameter_function ('$' ID '=' expression)"); $$ = DeclNode::ParamDeclExprWithAddressOp($3, $5); }
                 | type_list '$' ID                  { Console::ParserLog("parameter_function (type_list '$' ID)"); $$ = DeclNode::ParamDeclType($3, $1); }
+                | type_list '&' '$' ID              { Console::ParserLog("parameter_function (type_list '$' ID)"); $$ = DeclNode::ParamDeclTypeWithAddressOp($4, $1); }
                 | type_list '$' ID '=' expression   { Console::ParserLog("parameter_function (type_list '$' ID '=' expression)"); $$ = DeclNode::ParamDeclExprType($3, $5, $1); }
+                | type_list '&' '$' ID '=' expression   { Console::ParserLog("parameter_function (type_list '$' ID '=' expression)"); $$ = DeclNode::ParamDeclExprTypeWithAddressOp($4, $6, $1); }
                 ;
 
 

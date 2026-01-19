@@ -29,6 +29,7 @@ public:
     string className;
     string classNameExtended;
 
+    bool hasAddressOperator = false;
     int isStatic = -1;
     VisibilityType visibilityType = VisibilityType::VISIBILITY_UNKNOWN;
 
@@ -70,11 +71,19 @@ public:
 
     static DeclNode *ParamDecl(string *name);
 
+    static DeclNode *ParamDeclWithAddressOp(string *name);
+
     static DeclNode *ParamDeclType(string *name, ValueNode *type);
+
+    static DeclNode *ParamDeclTypeWithAddressOp(string *name, ValueNode *type);
 
     static DeclNode *ParamDeclExpr(string *name, ExprNode *expr);
 
+    static DeclNode *ParamDeclExprWithAddressOp(string *name, ExprNode *expr);
+
     static DeclNode *ParamDeclExprType(string *name, ExprNode *expr, ValueNode *type);
+
+    static DeclNode *ParamDeclExprTypeWithAddressOp(string *name, ExprNode *expr, ValueNode *type);
 
     static DeclNode *FunctionDecl(string *name, DeclNode *params);
 

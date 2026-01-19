@@ -234,6 +234,10 @@ string DeclNode::toJson() const {
         j["isStatic"] = isStatic;
     }
 
+    if (hasAddressOperator) {
+        j["hasAddressOperator"] = hasAddressOperator;
+    }
+
     if (visibilityType != VisibilityType::VISIBILITY_UNKNOWN) {
         j["visibilityType"] = toString(visibilityType);
     }
@@ -298,6 +302,10 @@ string DeclNode::toDot() const {
 
     if (isStatic != -1) {
         label += "\\nStatic: " + std::to_string(isStatic);
+    }
+
+    if (hasAddressOperator) {
+        label += "\\nReference (&)";
     }
 
     if (visibilityType != VisibilityType::VISIBILITY_UNKNOWN) {
@@ -695,11 +703,30 @@ DeclNode *DeclNode::ParamDecl(string *name) {
     return node;
 }
 
+DeclNode *DeclNode::ParamDeclWithAddressOp(string *name) {
+    auto node = new DeclNode();
+    node->type = DT_PARAMETER;
+    node->name = *name;
+    node->hasAddressOperator = true;
+    node->WriteToFiles();
+    return node;
+}
+
 DeclNode *DeclNode::ParamDeclType(string *name, ValueNode *type) {
     auto node = new DeclNode();
     node->type = DT_PARAMETER;
     node->name = *name;
     node->valueType = type;
+    node->WriteToFiles();
+    return node;
+}
+
+DeclNode *DeclNode::ParamDeclTypeWithAddressOp(string *name, ValueNode *type) {
+    auto node = new DeclNode();
+    node->type = DT_PARAMETER;
+    node->name = *name;
+    node->valueType = type;
+    node->hasAddressOperator = true;
     node->WriteToFiles();
     return node;
 }
@@ -713,12 +740,33 @@ DeclNode *DeclNode::ParamDeclExpr(string *name, ExprNode *expr) {
     return node;
 }
 
+DeclNode *DeclNode::ParamDeclExprWithAddressOp(string *name, ExprNode *expr) {
+    auto node = new DeclNode();
+    node->type = DT_PARAMETER;
+    node->name = *name;
+    node->expr = expr;
+    node->hasAddressOperator = true;
+    node->WriteToFiles();
+    return node;
+}
+
 DeclNode *DeclNode::ParamDeclExprType(string *name, ExprNode *expr, ValueNode *type) {
     auto node = new DeclNode();
     node->type = DT_PARAMETER;
     node->name = *name;
     node->expr = expr;
     node->valueType = type;
+    node->WriteToFiles();
+    return node;
+}
+
+DeclNode *DeclNode::ParamDeclExprTypeWithAddressOp(string *name, ExprNode *expr, ValueNode *type) {
+    auto node = new DeclNode();
+    node->type = DT_PARAMETER;
+    node->name = *name;
+    node->expr = expr;
+    node->valueType = type;
+    node->hasAddressOperator = true;
     node->WriteToFiles();
     return node;
 }
