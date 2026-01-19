@@ -3,14 +3,16 @@
 #include <sstream>
 #include <iomanip>
 #include <vector>
+#include <unordered_map>
 
 #include "core/helpers/Console.h"
+#include "core/nodes/DeclNode.h"
+#include "core/nodes/enums/DeclType.h"
 #include "jvm/descriptor-field.h"
 #include "jvm/descriptor-method.h"
 #include "jvm/field.h"
-#include <unordered_map>
-#include <utility>
 
+class DeclNode;
 using namespace jvm;
 
 struct LocalScopeInfo {
@@ -86,21 +88,6 @@ static const ExprNode *childOrNull(const ExprNode *e, size_t i) {
     return e->children[i];
 }
 
-static std::string toLowerAscii(std::string s) {
-    for (char &c: s) c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
-    return s;
-}
-
-// PHP namespaces '\' -> JVM '/' and make it case-insensitive like PHP classes
-static std::string toJvmInternalNameExpr(std::string s) {
-    s = toLowerAscii(s);
-    for (char &c: s) {
-        if (c == '\\') c = '/';
-    }
-    while (!s.empty() && s.front() == '/') s.erase(s.begin());
-    return s;
-}
-
 static void emitBinary(
     Class *root,
     Method *method,
@@ -110,9 +97,9 @@ static void emitBinary(
     ConstantMethodref *op,
     void (*emitValue)(Class *, Method *, AttributeCode *, const ExprNode *)
 ) {
-    emitValue(root, method, code, left); // push BasePhpValue
-    emitValue(root, method, code, right); // push BasePhpValue
-    *code << code->InvokeStatic(op); // pop2 push1
+    emitValue(root, method, code, left);
+    emitValue(root, method, code, right);
+    *code << code->InvokeStatic(op);
 }
 
 static void emitUnary(
@@ -123,8 +110,8 @@ static void emitUnary(
     ConstantMethodref *op,
     void (*emitValue)(Class *, Method *, AttributeCode *, const ExprNode *)
 ) {
-    emitValue(root, method, code, operand); // push BasePhpValue
-    *code << code->InvokeStatic(op); // pop1 push1
+    emitValue(root, method, code, operand);
+    *code << code->InvokeStatic(op);
 }
 
 static std::string sanitizeJavaIdentLocal(const std::string &raw) {
@@ -133,14 +120,14 @@ static std::string sanitizeJavaIdentLocal(const std::string &raw) {
 
     std::string out;
     out.reserve(s.size() + 4);
-    out += "g_"; // global var prefix
+    out += "g_";
 
     for (char c: s) {
         if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_') out.push_back(c);
         else out.push_back('_');
     }
 
-    if (out.size() == 2) out += "var"; // "g_" only
+    if (out.size() == 2) out += "var";
     if (out.size() >= 3 && (out[2] >= '0' && out[2] <= '9')) out.insert(out.begin() + 2, '_');
     return out;
 }
@@ -169,10 +156,10 @@ static void emitLoadGlobalVar(
     auto *L_nonNull = code->CodeLabel();
     auto *L_end = code->CodeLabel();
 
-    *code << code->GetStatic(fieldRef); // v
-    *code << code->Duplicate(); // v v
-    *code << code->IfNotNull(L_nonNull); // pops one v; stack: v
-    *code << code->PopOne(); // pop null
+    *code << code->GetStatic(fieldRef);
+    *code << code->Duplicate();
+    *code << code->IfNotNull(L_nonNull);
+    *code << code->PopOne();
     *code << code->GetStatic(nullValueField);
     *code << code->GoTo(L_end);
 
@@ -184,9 +171,7 @@ static std::string idText(const ExprNode *e) {
     if (!e) return "";
     if (!e->name.empty()) return e->name;
     if (e->value) {
-        // in your semantics you sometimes use value->name for ET_ID
         if (!e->value->name.empty()) return e->value->name;
-        // fallback if you ever store it differently
         if (e->value->stringValue.data()) return std::string(e->value->stringValue);
     }
     return "";
@@ -203,19 +188,103 @@ static std::string sanitizeJavaIdent(const std::string &raw) {
 
     std::string out;
     out.reserve(s.size() + 4);
-    out += "g_"; // global var prefix
+    out += "g_";
 
     for (char c: s) {
         if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_') out.push_back(c);
         else out.push_back('_');
     }
 
-    if (out.size() == 2) out += "var"; // "g_" only
+    if (out.size() == 2) out += "var";
     if (out.size() >= 3 && (out[2] >= '0' && out[2] <= '9')) out.insert(out.begin() + 2, '_');
     return out;
 }
 
-// Emits BasePhpValue[] on stack
+// ----------------------------------------------------------------------------
+// Signature registry (for call-site checks + by-ref marker emission)
+// ----------------------------------------------------------------------------
+struct PhpParamSig {
+    bool byRef = false;
+    std::vector<std::string> types; // lowercase, union expanded
+};
+
+struct PhpFuncSig {
+    std::vector<PhpParamSig> params;
+    std::vector<std::string> returnTypes; // lowercase
+};
+
+static std::unordered_map<std::string, PhpFuncSig> g_functionSigs;
+static std::unordered_map<std::string, PhpFuncSig> g_methodSigs; // key: "class::method" lower
+
+// NOTE: This assumes ValueNode has .elements with .name like your JSON.
+// If your ValueNode differs, adapt these helpers.
+static std::vector<std::string> collectTypeNames(ValueNode *vt) {
+    std::vector<std::string> out;
+    if (!vt) return out;
+    try {
+        for (auto *el: vt->valueList) {
+            if (!el) continue;
+            if (!el->name.empty()) out.push_back(lowerCopy(el->name));
+        }
+    } catch (...) {
+    }
+    return out;
+}
+
+static std::vector<DeclNode *> flattenParamList(DeclNode *params) {
+    std::vector<DeclNode *> out;
+    if (!params) return out;
+
+    if (params->type == DT_LIST) {
+        for (auto *ch: params->children) {
+            if (ch && ch->type == DT_PARAMETER) out.push_back(ch);
+        }
+    } else if (params->type == DT_PARAMETER) {
+        out.push_back(params);
+    }
+    return out;
+}
+
+void ExprBuilder::RegisterFunctionSignature(const std::string &fnLower, DeclNode *params, ValueNode *retType) {
+    PhpFuncSig sig;
+    auto ps = flattenParamList(params);
+    sig.params.reserve(ps.size());
+
+    for (auto *p: ps) {
+        PhpParamSig psig;
+        psig.byRef = (p && p->hasAddressOperator);
+        psig.types = collectTypeNames(p ? p->valueType : nullptr);
+        sig.params.push_back(psig);
+    }
+    sig.returnTypes = collectTypeNames(retType);
+    g_functionSigs[lowerCopy(fnLower)] = sig;
+}
+
+void ExprBuilder::RegisterMethodSignature(const std::string &classLower, const std::string &methodLower,
+                                          DeclNode *params, ValueNode *retType) {
+    PhpFuncSig sig;
+    auto ps = flattenParamList(params);
+    sig.params.reserve(ps.size());
+
+    for (auto *p: ps) {
+        PhpParamSig psig;
+        psig.byRef = (p && p->hasAddressOperator);
+        psig.types = collectTypeNames(p ? p->valueType : nullptr);
+        sig.params.push_back(psig);
+    }
+    sig.returnTypes = collectTypeNames(retType);
+
+    std::string key = lowerCopy(classLower) + "::" + lowerCopy(methodLower);
+    g_methodSigs[key] = sig;
+}
+
+static const PhpFuncSig *findFunctionSig(const std::string &fnLower) {
+    auto it = g_functionSigs.find(lowerCopy(fnLower));
+    if (it == g_functionSigs.end()) return nullptr;
+    return &it->second;
+}
+
+// Emits BasePhpValue[] on stack (old helper)
 static void emitArgsArray(Class *root, Method *method, AttributeCode *code, const ExprNode *argsNode) {
     auto *basePhpValueClass = root->getOrCreateClassConstant("com/phpjvm/BasePhpValue");
 
@@ -229,13 +298,27 @@ static void emitArgsArray(Class *root, Method *method, AttributeCode *code, cons
     }
 
     *code << code->PushInt((int32_t) args.size());
-    *code << code->NewArray(basePhpValueClass); // BasePhpValue[]
+    *code << code->NewArray(basePhpValueClass);
 
     for (size_t i = 0; i < args.size(); i++) {
-        *code << code->Duplicate(); // arr, arr
-        *code << code->PushInt((int32_t) i); // arr, arr, i
-        ExprBuilder::EmitValue(root, method, code, args[i]); // arr, arr, i, val
-        *code << code->StoreReferenceToArray(); // arr
+        *code << code->Duplicate();
+        *code << code->PushInt((int32_t) i);
+        ExprBuilder::EmitValue(root, method, code, args[i]);
+        *code << code->StoreReferenceToArray();
+    }
+}
+
+static void emitStringArrayConst(Class *root, AttributeCode *code, const std::vector<std::string> &items) {
+    auto *stringClass = root->getOrCreateClassConstant("java/lang/String");
+
+    *code << code->PushInt((int32_t) items.size());
+    *code << code->NewArray(stringClass);
+
+    for (size_t i = 0; i < items.size(); i++) {
+        *code << code->Duplicate();
+        *code << code->PushInt((int32_t) i);
+        *code << code->PushString(items[i]);
+        *code << code->StoreReferenceToArray();
     }
 }
 
@@ -265,7 +348,7 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
         "of",
         DescriptorMethod(
             DescriptorField("com/phpjvm/BasePhpValue"),
-            {DescriptorField("Z")} // boolean
+            {DescriptorField("Z")}
         )
     );
 
@@ -274,7 +357,7 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
         "of",
         DescriptorMethod(
             DescriptorField("com/phpjvm/BasePhpValue"),
-            {DescriptorField("J")} // long
+            {DescriptorField("J")}
         )
     );
 
@@ -283,11 +366,10 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
         "of",
         DescriptorMethod(
             DescriptorField("com/phpjvm/BasePhpValue"),
-            {DescriptorField("D")} // double
+            {DescriptorField("D")}
         )
     );
 
-    // arithmetic / concat already exist in your RTL
     auto *add = root->getOrCreateMethodrefConstant(
         "com/phpjvm/BasePhpValue",
         "add",
@@ -418,7 +500,6 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
         )
     );
 
-    // comparisons you already have:
     auto *eq = root->getOrCreateMethodrefConstant(
         "com/phpjvm/BasePhpValue",
         "eq",
@@ -452,7 +533,6 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
         )
     );
 
-    // NEW helpers you add to RTL in step (1):
     auto *ne = root->getOrCreateMethodrefConstant(
         "com/phpjvm/BasePhpValue",
         "ne",
@@ -518,7 +598,6 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
         )
     );
 
-    // BasePhpValue instance helpers
     auto *toBool = root->getOrCreateMethodrefConstant(
         "com/phpjvm/BasePhpValue",
         "toBool",
@@ -537,7 +616,6 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
         DescriptorMethod(DescriptorField("com/phpjvm/PhpObject"), {})
     );
 
-    // PhpRuntime calls
     auto *rtCallMethod = root->getOrCreateMethodrefConstant(
         "com/phpjvm/PhpRuntime",
         "callMethod",
@@ -546,7 +624,7 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
             {
                 DescriptorField("com/phpjvm/PhpObject"),
                 DescriptorField("java/lang/String"),
-                DescriptorField("com/phpjvm/BasePhpValue", 1) // BasePhpValue[]
+                DescriptorField("com/phpjvm/BasePhpValue", 1)
             }
         )
     );
@@ -576,7 +654,6 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
         )
     );
 
-    // PhpObject property access
     auto *objGetProp = root->getOrCreateMethodrefConstant(
         "com/phpjvm/PhpObject",
         "getProperty",
@@ -586,7 +663,6 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
         )
     );
 
-    // Arrays
     auto *arrFactory = root->getOrCreateMethodrefConstant(
         "com/phpjvm/BasePhpValue",
         "array",
@@ -606,7 +682,7 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
         "com/phpjvm/BasePhpValue",
         "arraySet",
         DescriptorMethod(
-            std::nullopt, // void
+            std::nullopt,
             {
                 DescriptorField("com/phpjvm/BasePhpValue"), DescriptorField("com/phpjvm/BasePhpValue"),
                 DescriptorField("com/phpjvm/BasePhpValue")
@@ -618,7 +694,7 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
         "com/phpjvm/BasePhpValue",
         "arrayAppend",
         DescriptorMethod(
-            std::nullopt, // void
+            std::nullopt,
             {DescriptorField("com/phpjvm/BasePhpValue"), DescriptorField("com/phpjvm/BasePhpValue")}
         )
     );
@@ -630,18 +706,50 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
             DescriptorField("com/phpjvm/BasePhpValue"),
             {
                 DescriptorField("java/lang/String"),
-                DescriptorField("com/phpjvm/BasePhpValue", 1) // BasePhpValue[]
+                DescriptorField("com/phpjvm/BasePhpValue", 1)
             }
         )
     );
 
+    // NEW: typecheck + ref marker maker
+    auto *rtAssertParamType = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/PhpRuntime",
+        "assertParamType",
+        DescriptorMethod(
+            DescriptorField("com/phpjvm/BasePhpValue"),
+            {
+                DescriptorField("com/phpjvm/BasePhpValue"), DescriptorField("java/lang/String", 1),
+                DescriptorField("java/lang/String"), DescriptorField("java/lang/String")
+            }
+        )
+    );
+
+    auto *rtAssertReturnType = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/PhpRuntime",
+        "assertReturnType",
+        DescriptorMethod(
+            DescriptorField("com/phpjvm/BasePhpValue"),
+            {
+                DescriptorField("com/phpjvm/BasePhpValue"), DescriptorField("java/lang/String", 1),
+                DescriptorField("java/lang/String")
+            }
+        )
+    );
+
+    auto *rtMakeGlobalRef = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/PhpRuntime",
+        "makeGlobalRef",
+        DescriptorMethod(
+            DescriptorField("com/phpjvm/BasePhpValue"),
+            {DescriptorField("java/lang/String"), DescriptorField("java/lang/String")}
+        )
+    );
 
     if (expr == nullptr) {
         *code << code->GetStatic(nullValueField);
         return;
     }
 
-    // ---------- Dispatch ----------
     switch (expr->type) {
         case ExprType::ET_EXPR_LIST: {
             if (expr->children.empty()) {
@@ -652,13 +760,12 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
             for (size_t i = 0; i < expr->children.size(); i++) {
                 EmitValue(root, method, code, expr->children[i]);
                 if (i + 1 < expr->children.size()) {
-                    *code << code->PopOne(); // discard intermediate results
+                    *code << code->PopOne();
                 }
             }
-            return; // last value remains
+            return;
         }
 
-        // ===== literals (already working) =====
         case ExprType::ET_STRING: {
             std::string s = (expr->value ? expr->value->stringValue : "");
             *code << code->PushString(s);
@@ -692,14 +799,12 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
             return;
         }
 
-        // ===== parentheses =====
         case ExprType::ET_PARENTHESIZED: {
             const ExprNode *inner = childOrNull(expr, 0);
             EmitValue(root, method, code, inner);
             return;
         }
 
-        // ===== concat list (already in your code) =====
         case ExprType::ET_COMPLEX_STRING: {
             if (expr->children.empty() || expr->children[0] == nullptr) {
                 *code << code->PushString("");
@@ -732,7 +837,6 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
             return;
         }
 
-        // ===== arithmetic =====
         case ExprType::ET_ADD: {
             emitBinary(root, method, code, childOrNull(expr, 0), childOrNull(expr, 1), add, &ExprBuilder::EmitValue);
             return;
@@ -754,13 +858,11 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
             return;
         }
 
-        // ===== string concat "." =====
         case ExprType::ET_CONCAT: {
             emitBinary(root, method, code, childOrNull(expr, 0), childOrNull(expr, 1), concat, &ExprBuilder::EmitValue);
             return;
         }
 
-        // ===== comparisons =====
         case ExprType::ET_EQUAL: {
             emitBinary(root, method, code, childOrNull(expr, 0), childOrNull(expr, 1), eq, &ExprBuilder::EmitValue);
             return;
@@ -801,7 +903,6 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
             return;
         }
 
-        // ===== boolean ops (truthiness) =====
         case ExprType::ET_NOT: {
             emitUnary(root, method, code, childOrNull(expr, 0), boolNot, &ExprBuilder::EmitValue);
             return;
@@ -816,30 +917,9 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
             return;
         }
 
-        // ===== variables: $x =====
         case ExprType::ET_SIGIL: {
             const ExprNode *id = childOrNull(expr, 0);
             std::string var = idText(id);
-
-            // If we are inside a function/method local scope and this var is known -> load local
-            uint16_t localIndex = 0;
-            if (ExprBuilder::TryGetLocal(method, var, localIndex)) {
-                auto *L_nonNull = code->CodeLabel();
-                auto *L_end = code->CodeLabel();
-
-                *code << code->LoadReference(localIndex); // v
-                *code << code->Duplicate(); // v v
-                *code << code->IfNotNull(L_nonNull); // pops one v; stack: v
-                *code << code->PopOne(); // pop null
-                *code << code->GetStatic(nullValueField); // NULL_VALUE
-                *code << code->GoTo(L_end);
-
-                *code << L_nonNull;
-                *code << L_end;
-                return;
-            }
-
-            // Otherwise fallback to global static field behavior
             std::string fieldName = sanitizeJavaIdent(var);
 
             Field *f = root->getOrCreateField(fieldName, DescriptorField("com/phpjvm/BasePhpValue"));
@@ -855,10 +935,10 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
             auto *L_nonNull = code->CodeLabel();
             auto *L_end = code->CodeLabel();
 
-            *code << code->GetStatic(fieldRef); // v
-            *code << code->Duplicate(); // v v
+            *code << code->GetStatic(fieldRef);
+            *code << code->Duplicate();
             *code << code->IfNotNull(L_nonNull);
-            *code << code->PopOne(); // pop null
+            *code << code->PopOne();
             *code << code->GetStatic(nullValueField);
             *code << code->GoTo(L_end);
 
@@ -867,7 +947,6 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
             return;
         }
 
-        // ===== assignment: $x = rhs =====
         case ExprType::ET_ASSIGN: {
             const ExprNode *lhs = childOrNull(expr, 0);
             const ExprNode *rhs = childOrNull(expr, 1);
@@ -875,17 +954,6 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
             if (lhs && lhs->type == ExprType::ET_SIGIL) {
                 const ExprNode *id = childOrNull(lhs, 0);
                 std::string var = idText(id);
-
-                // Prefer local if in scope (or allocate local if in scope)
-                uint16_t localIndex = 0;
-                if (ExprBuilder::TryGetLocal(method, var, localIndex) || allocLocalIfInScope(method, var, localIndex)) {
-                    EmitValue(root, method, code, rhs); // value
-                    *code << code->Duplicate(); // value value
-                    *code << code->StoreReference(localIndex); // value
-                    return;
-                }
-
-                // Otherwise global
                 std::string fieldName = sanitizeJavaIdent(var);
 
                 Field *f = root->getOrCreateField(fieldName, DescriptorField("com/phpjvm/BasePhpValue"));
@@ -909,7 +977,6 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
             return;
         }
 
-        // ===== method call: $obj->m(a,b) =====
         case ExprType::ET_METHOD_ACCESS: {
             const ExprNode *objExpr = childOrNull(expr, 0);
             const ExprNode *nameExpr = childOrNull(expr, 1);
@@ -922,17 +989,16 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
                 return;
             }
 
-            EmitValue(root, method, code, objExpr); // BasePhpValue (object)
-            *code << code->InvokeVirtual(asObject); // PhpObject
+            EmitValue(root, method, code, objExpr);
+            *code << code->InvokeVirtual(asObject);
 
-            *code << code->PushString(methodName); // String
-            emitArgsArray(root, method, code, argsNode); // BasePhpValue[]
+            *code << code->PushString(methodName);
+            emitArgsArray(root, method, code, argsNode);
 
-            *code << code->InvokeStatic(rtCallMethod); // BasePhpValue
+            *code << code->InvokeStatic(rtCallMethod);
             return;
         }
 
-        // ===== property read: $obj->prop =====
         case ExprType::ET_PROPERTY_ACCESS: {
             const ExprNode *objExpr = childOrNull(expr, 0);
             const ExprNode *nameExpr = childOrNull(expr, 1);
@@ -944,14 +1010,13 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
                 return;
             }
 
-            EmitValue(root, method, code, objExpr); // BasePhpValue
-            *code << code->InvokeVirtual(asObject); // PhpObject
-            *code << code->PushString(propName); // String
-            *code << code->InvokeVirtual(objGetProp); // BasePhpValue
+            EmitValue(root, method, code, objExpr);
+            *code << code->InvokeVirtual(asObject);
+            *code << code->PushString(propName);
+            *code << code->InvokeVirtual(objGetProp);
             return;
         }
 
-        // ===== new Foo(a,b) =====
         case ExprType::ET_NEW: {
             const ExprNode *classNameExpr = nullptr;
             const ExprNode *argsNode = nullptr;
@@ -960,7 +1025,6 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
                 classNameExpr = childOrNull(expr, 0);
                 argsNode = childOrNull(expr, 1);
             } else if (expr->children.size() == 1) {
-                // you have New(args) overload; without class name we can't resolve it safely yet
                 Console::Warning("ET_NEW: missing class name in AST (pushing NULL)");
                 *code << code->GetStatic(nullValueField);
                 return;
@@ -975,42 +1039,35 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
 
             *code << code->PushString(className);
             emitArgsArray(root, method, code, argsNode);
-            *code << code->InvokeStatic(rtNewObject); // BasePhpValue (OBJECT)
+            *code << code->InvokeStatic(rtNewObject);
             return;
         }
 
-        // ===== arrays: [] =====
         case ExprType::ET_ARRAY_EMPTY: {
-            *code << code->InvokeStatic(arrFactory); // BasePhpValue array
+            *code << code->InvokeStatic(arrFactory);
             return;
         }
 
-        // ===== arrays: $arr[$k] =====
         case ExprType::ET_ARRAY_INDEX: {
-            EmitValue(root, method, code, childOrNull(expr, 0)); // arr
-            EmitValue(root, method, code, childOrNull(expr, 1)); // key
-            *code << code->InvokeStatic(arrGet); // value
+            EmitValue(root, method, code, childOrNull(expr, 0));
+            EmitValue(root, method, code, childOrNull(expr, 1));
+            *code << code->InvokeStatic(arrGet);
             return;
         }
 
-        // ===== arrays: [$k => $v] pair node (used inside list) =====
         case ExprType::ET_ARRAY_KEY_ACCESS: {
-            // This node is usually handled by ET_ARRAY_ELEMENT_LIST,
-            // but if it appears alone, make a single-element array.
-            *code << code->InvokeStatic(arrFactory); // arr
-            *code << code->Duplicate(); // arr arr
-            EmitValue(root, method, code, childOrNull(expr, 0)); // arr arr key
-            EmitValue(root, method, code, childOrNull(expr, 1)); // arr arr key val
-            *code << code->InvokeStatic(arrSet); // arr
+            *code << code->InvokeStatic(arrFactory);
+            *code << code->Duplicate();
+            EmitValue(root, method, code, childOrNull(expr, 0));
+            EmitValue(root, method, code, childOrNull(expr, 1));
+            *code << code->InvokeStatic(arrSet);
             return;
         }
 
-        // ===== arrays: element list =====
         case ExprType::ET_ARRAY_ELEMENT_LIST: {
-            // children[0] is "elements" (often ET_EXPR_LIST)
             const ExprNode *elements = childOrNull(expr, 0);
 
-            *code << code->InvokeStatic(arrFactory); // arr
+            *code << code->InvokeStatic(arrFactory);
 
             std::vector<const ExprNode *> parts;
             if (elements) {
@@ -1025,39 +1082,36 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
                 if (!p) continue;
 
                 if (p->type == ExprType::ET_ARRAY_KEY_ACCESS) {
-                    *code << code->Duplicate(); // arr arr
-                    EmitValue(root, method, code, childOrNull(p, 0)); // key
-                    EmitValue(root, method, code, childOrNull(p, 1)); // val
-                    *code << code->InvokeStatic(arrSet); // arr
+                    *code << code->Duplicate();
+                    EmitValue(root, method, code, childOrNull(p, 0));
+                    EmitValue(root, method, code, childOrNull(p, 1));
+                    *code << code->InvokeStatic(arrSet);
                 } else {
-                    *code << code->Duplicate(); // arr arr
-                    EmitValue(root, method, code, p); // arr arr val
-                    *code << code->InvokeStatic(arrAppend); // arr
+                    *code << code->Duplicate();
+                    EmitValue(root, method, code, p);
+                    *code << code->InvokeStatic(arrAppend);
                 }
             }
             return;
         }
 
-        // ===== arrays: $arr[] = $v OR array_append expr node =====
         case ExprType::ET_ARRAY_APPEND: {
-            EmitValue(root, method, code, childOrNull(expr, 0)); // arr
-            *code << code->Duplicate(); // arr arr
-            EmitValue(root, method, code, childOrNull(expr, 1)); // arr arr val
-            *code << code->InvokeStatic(arrAppend); // arr
+            EmitValue(root, method, code, childOrNull(expr, 0));
+            *code << code->Duplicate();
+            EmitValue(root, method, code, childOrNull(expr, 1));
+            *code << code->InvokeStatic(arrAppend);
             return;
         }
 
-        // ===== arrays: $arr[$k] = $v (your semantics rewrites ET_ASSIGN into this) =====
         case ExprType::ET_ARRAY_ASSIGNMENT: {
-            EmitValue(root, method, code, childOrNull(expr, 0)); // arr
-            *code << code->Duplicate(); // arr arr
-            EmitValue(root, method, code, childOrNull(expr, 1)); // key
-            EmitValue(root, method, code, childOrNull(expr, 2)); // val
-            *code << code->InvokeStatic(arrSet); // arr
+            EmitValue(root, method, code, childOrNull(expr, 0));
+            *code << code->Duplicate();
+            EmitValue(root, method, code, childOrNull(expr, 1));
+            EmitValue(root, method, code, childOrNull(expr, 2));
+            *code << code->InvokeStatic(arrSet);
             return;
         }
 
-        // ===== ternary: cond ? a : b =====
         case ExprType::ET_TERNARY: {
             const ExprNode *cond = childOrNull(expr, 0);
             const ExprNode *a = childOrNull(expr, 1);
@@ -1066,9 +1120,9 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
             auto *L_false = code->CodeLabel();
             auto *L_end = code->CodeLabel();
 
-            EmitValue(root, method, code, cond); // BasePhpValue
-            *code << code->InvokeVirtual(toBool); // int(0/1)
-            *code << code->If(Instruction::Compare::Equal, L_false); // if 0 -> false
+            EmitValue(root, method, code, cond);
+            *code << code->InvokeVirtual(toBool);
+            *code << code->If(Instruction::Compare::Equal, L_false);
 
             EmitValue(root, method, code, a);
             *code << code->GoTo(L_end);
@@ -1080,7 +1134,6 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
             return;
         }
 
-        // ===== null coalescing: a ?? b =====
         case ExprType::ET_NULL_COALESCING: {
             const ExprNode *a = childOrNull(expr, 0);
             const ExprNode *b = childOrNull(expr, 1);
@@ -1088,17 +1141,16 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
             auto *L_isNull = code->CodeLabel();
             auto *L_end = code->CodeLabel();
 
-            EmitValue(root, method, code, a); // v
-            *code << code->Duplicate(); // v v
-            *code << code->InvokeVirtual(isNull); // v bool
-            *code << code->If(Instruction::Compare::NotEqual, L_isNull); // if true -> jump; pops bool; leaves v
+            EmitValue(root, method, code, a);
+            *code << code->Duplicate();
+            *code << code->InvokeVirtual(isNull);
+            *code << code->If(Instruction::Compare::NotEqual, L_isNull);
 
-            // not null: keep v
             *code << code->GoTo(L_end);
 
             *code << L_isNull;
-            *code << code->PopOne(); // drop v (it is NULL)
-            EmitValue(root, method, code, b); // push b
+            *code << code->PopOne();
+            EmitValue(root, method, code, b);
 
             *code << L_end;
             return;
@@ -1142,7 +1194,7 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
             // ---- builtins (stdin) ----
             if (fnName == "fgets" || fnName == "fgetc") {
                 *code << code->PushString(fnName);
-                emitArgsArray(root, method, code, argsNode); // args ignored by runtime for now
+                emitArgsArray(root, method, code, argsNode);
                 *code << code->InvokeStatic(rtCallFunction);
                 return;
             }
@@ -1157,30 +1209,98 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
                 )
             );
 
-            emitArgsArray(root, method, code, argsNode);
-            *code << code->InvokeStatic(callFn);
+            // If we have a signature, we can:
+            // - emit by-ref markers for $var args
+            // - check provided arg types
+            // - check return type after call
+            const PhpFuncSig *sig = findFunctionSig(fnName);
+
+            auto *basePhpValueClass = root->getOrCreateClassConstant("com/phpjvm/BasePhpValue");
+            std::vector<const ExprNode *> args;
+            if (argsNode) {
+                if (argsNode->type == ExprType::ET_EXPR_LIST) {
+                    for (auto *ch: argsNode->children) if (ch) args.push_back(ch);
+                } else {
+                    args.push_back(argsNode);
+                }
+            }
+
+            *code << code->PushInt((int32_t) args.size());
+            *code << code->NewArray(basePhpValueClass);
+
+            for (size_t i = 0; i < args.size(); i++) {
+                *code << code->Duplicate();
+                *code << code->PushInt((int32_t) i);
+
+                bool wantByRef = false;
+                std::vector<std::string> wantTypes;
+                if (sig && i < sig->params.size()) {
+                    wantByRef = sig->params[i].byRef;
+                    wantTypes = sig->params[i].types;
+                }
+
+                const ExprNode *ai = args[i];
+
+                if (wantByRef) {
+                    // Only allow $var (ET_SIGIL) at call sites. Emit a marker instead of the value.
+                    if (ai && ai->type == ExprType::ET_SIGIL) {
+                        const ExprNode *id = childOrNull(ai, 0);
+                        std::string var = idText(id);
+                        std::string fieldName = sanitizeJavaIdent(var);
+
+                        // host class for globals is the current program class (dot name)
+                        std::string hostDot = root->getClassName();
+                        for (char &c: hostDot) if (c == '/') c = '.';
+
+                        *code << code->PushString(hostDot);
+                        *code << code->PushString(fieldName);
+                        *code << code->InvokeStatic(rtMakeGlobalRef); // BasePhpValue (marker string)
+                    } else {
+                        // pass normal value; callee will throw when it sees it's not a marker
+                        EmitValue(root, method, code, ai);
+                    }
+                } else {
+                    EmitValue(root, method, code, ai);
+
+                    // call-site param type check (only for provided args)
+                    if (sig && i < sig->params.size() && !wantTypes.empty()) {
+                        emitStringArrayConst(root, code, wantTypes); // String[] allowed
+                        *code << code->PushString(fnName);
+                        // paramName not available here, pass "argN"
+                        *code << code->PushString(std::string("arg") + std::to_string(i + 1));
+                        *code << code->InvokeStatic(rtAssertParamType);
+                    }
+                }
+
+                *code << code->StoreReferenceToArray();
+            }
+
+            *code << code->InvokeStatic(callFn); // BasePhpValue
+
+            // call-site return type check
+            if (sig && !sig->returnTypes.empty()) {
+                emitStringArrayConst(root, code, sig->returnTypes);
+                *code << code->PushString(fnName);
+                *code << code->InvokeStatic(rtAssertReturnType);
+            }
+
             return;
         }
 
-        // ===== identifier constant (e.g. STDIN) =====
         case ExprType::ET_ID: {
             std::string name = idText(expr);
 
-            // Special stream constants (you can extend this later)
             if (name == "STDIN" || name == "STDOUT" || name == "STDERR") {
                 *code << code->PushString(name);
-                *code << code->InvokeStatic(ofString); // BasePhpValue.of(String)
+                *code << code->InvokeStatic(ofString);
                 return;
             }
 
-            // If a bare identifier ever appears as an expression, treat it as a string constant for now.
-            // (Better: add a proper "constant table" / define() support later.)
             *code << code->PushString(name);
             *code << code->InvokeStatic(ofString);
             return;
         }
 
-        // ===== "and/or" lower-precedence tokens: map to same runtime helpers for now =====
         case ExprType::ET_AND_LOWER: {
             emitBinary(root, method, code, childOrNull(expr, 0), childOrNull(expr, 1), boolAnd,
                        &ExprBuilder::EmitValue);
@@ -1200,7 +1320,7 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
             *code << code->PushLong(0);
             *code << code->InvokeStatic(ofLong);
             EmitValue(root, method, code, childOrNull(expr, 0));
-            *code << code->InvokeStatic(sub); // 0 - x
+            *code << code->InvokeStatic(sub);
             return;
         }
 
@@ -1208,7 +1328,6 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
             emitUnary(root, method, code, childOrNull(expr, 0), bitNot, &ExprBuilder::EmitValue);
             return;
         }
-
         case ExprType::ET_AND_BITWISE: {
             emitBinary(root, method, code, childOrNull(expr, 0), childOrNull(expr, 1), bitAnd, &ExprBuilder::EmitValue);
             return;
@@ -1242,9 +1361,7 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
                        &ExprBuilder::EmitValue);
             return;
         }
-
         case ExprType::ET_NOT_EQUAL_BITWISE: {
-            // PHP "<>" is the same as "!="
             emitBinary(root, method, code, childOrNull(expr, 0), childOrNull(expr, 1), ne, &ExprBuilder::EmitValue);
             return;
         }
@@ -1269,6 +1386,10 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
 
             const ExprNode *id = childOrNull(lhs, 0);
             std::string var = idText(id);
+            auto *fieldRef = ensureGlobalVarField(root, var);
+
+            emitLoadGlobalVar(root, code, fieldRef, nullValueField);
+            EmitValue(root, method, code, rhs);
 
             ConstantMethodref *op = nullptr;
             switch (expr->type) {
@@ -1299,27 +1420,6 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
                 return;
             }
 
-            // Local?
-            uint16_t localIndex = 0;
-            if (ExprBuilder::TryGetLocal(method, var, localIndex)) {
-                // load current
-                *code << code->LoadReference(localIndex);
-                // rhs
-                EmitValue(root, method, code, rhs);
-                // apply op
-                *code << code->InvokeStatic(op);
-                // store + return value
-                *code << code->Duplicate();
-                *code << code->StoreReference(localIndex);
-                return;
-            }
-
-            // Global fallback
-            auto *fieldRef = ensureGlobalVarField(root, var);
-            emitLoadGlobalVar(root, code, fieldRef, nullValueField);
-
-            EmitValue(root, method, code, rhs);
-
             *code << code->InvokeStatic(op);
             *code << code->Duplicate();
             *code << code->PutStatic(fieldRef);
@@ -1340,6 +1440,7 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
 
             const ExprNode *id = childOrNull(lhs, 0);
             std::string var = idText(id);
+            auto *fieldRef = ensureGlobalVarField(root, var);
 
             bool isInc =
                     (expr->type == ExprType::ET_INCREMENT_PRE) ||
@@ -1349,101 +1450,30 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
                     (expr->type == ExprType::ET_INCREMENT_POST) ||
                     (expr->type == ExprType::ET_DECREMENT_POST);
 
-            // Local?
-            uint16_t localIndex = 0;
-            if (ExprBuilder::TryGetLocal(method, var, localIndex)) {
-                if (isPost) {
-                    *code << code->LoadReference(localIndex); // old
-                    *code << code->Duplicate(); // old old
-
-                    *code << code->PushLong(1);
-                    *code << code->InvokeStatic(ofLong); // old old one
-
-                    *code << code->InvokeStatic(isInc ? add : sub); // old new
-
-                    *code << code->Duplicate(); // old new new
-                    *code << code->StoreReference(localIndex); // old new
-                    *code << code->PopOne(); // old
-                    return;
-                } else {
-                    *code << code->LoadReference(localIndex); // old
-
-                    *code << code->PushLong(1);
-                    *code << code->InvokeStatic(ofLong); // old one
-
-                    *code << code->InvokeStatic(isInc ? add : sub); // new
-                    *code << code->Duplicate(); // new new
-                    *code << code->StoreReference(localIndex); // new
-                    return;
-                }
-            }
-
-            // Global fallback
-            auto *fieldRef = ensureGlobalVarField(root, var);
-
             if (isPost) {
-                emitLoadGlobalVar(root, code, fieldRef, nullValueField); // old
-                *code << code->Duplicate(); // old old
+                emitLoadGlobalVar(root, code, fieldRef, nullValueField);
+                *code << code->Duplicate();
 
                 *code << code->PushLong(1);
-                *code << code->InvokeStatic(ofLong); // old old one
+                *code << code->InvokeStatic(ofLong);
 
-                *code << code->InvokeStatic(isInc ? add : sub); // old new
+                *code << code->InvokeStatic(isInc ? add : sub);
 
-                *code << code->Duplicate(); // old new new
-                *code << code->PutStatic(fieldRef); // old new
-                *code << code->PopOne(); // old
+                *code << code->Duplicate();
+                *code << code->PutStatic(fieldRef);
+                *code << code->PopOne();
                 return;
             } else {
-                emitLoadGlobalVar(root, code, fieldRef, nullValueField); // old
+                emitLoadGlobalVar(root, code, fieldRef, nullValueField);
 
                 *code << code->PushLong(1);
-                *code << code->InvokeStatic(ofLong); // old one
+                *code << code->InvokeStatic(ofLong);
 
-                *code << code->InvokeStatic(isInc ? add : sub); // new
+                *code << code->InvokeStatic(isInc ? add : sub);
                 *code << code->Duplicate();
                 *code << code->PutStatic(fieldRef);
                 return;
             }
-        }
-
-        case ExprType::ET_STATIC_PROPERTY_ACCESS: {
-            const ExprNode *classExpr = childOrNull(expr, 0);
-            const ExprNode *nameExpr = childOrNull(expr, 1);
-
-            std::string clsName = idText(classExpr);
-            std::string member = idText(nameExpr);
-
-            if (clsName.empty() || member.empty()) {
-                Console::Warning("ET_STATIC_PROPERTY_ACCESS: missing class or member (pushing NULL)");
-                *code << code->GetStatic(nullValueField);
-                return;
-            }
-
-            // Your DeclNode lowercases JVM class names (PHP class names are case-insensitive)
-            std::string owner = toJvmInternalNameExpr(clsName); // <- use the helper above
-            // NOTE: constants/fields ARE case-sensitive, so keep member as-is ("X")
-
-            auto *fieldRef = root->getOrCreateFieldrefConstant(
-                owner,
-                member,
-                DescriptorField("com/phpjvm/BasePhpValue")
-            );
-
-            // Load static; if null -> BasePhpValue.NULL_VALUE (safety)
-            auto *L_nonNull = code->CodeLabel();
-            auto *L_end = code->CodeLabel();
-
-            *code << code->GetStatic(fieldRef); // v
-            *code << code->Duplicate(); // v v
-            *code << code->IfNotNull(L_nonNull); // pops one v; stack: v
-            *code << code->PopOne(); // pop null
-            *code << code->GetStatic(nullValueField);
-            *code << code->GoTo(L_end);
-
-            *code << L_nonNull;
-            *code << L_end;
-            return;
         }
 
         default:

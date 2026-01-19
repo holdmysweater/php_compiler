@@ -34,6 +34,12 @@ static const EmbeddedClassFile kPhpRuntimeFiles[] = {
     {"com/phpjvm/PhpObject.class", PhpObject_class, PhpObject_class_len},
     {"com/phpjvm/PhpRuntime.class", PhpRuntime_class, PhpRuntime_class_len},
     {"com/phpjvm/PhpStaticMethod.class", PhpStaticMethod_class, PhpStaticMethod_class_len},
+    {"com/phpjvm/PhpRef.class", PhpRef_class, PhpRef_class_len},
+    {
+        "com/phpjvm/PhpRuntime$StaticFieldRef.class",
+        PhpRuntime_StaticFieldRef_class,
+        PhpRuntime_StaticFieldRef_class_len
+    },
 };
 static const std::size_t kPhpRuntimeFilesCount = sizeof(kPhpRuntimeFiles) / sizeof(kPhpRuntimeFiles[0]);
 

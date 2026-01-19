@@ -1,6 +1,7 @@
 #ifndef PHP_COMPILER_EXPRBUILDER_H
 #define PHP_COMPILER_EXPRBUILDER_H
 
+#include "core/nodes/DeclNode.h"
 #include "core/nodes/ExprNode.h"
 #include "jvm/attribute-code.h"
 #include "jvm/class.h"
@@ -8,6 +9,11 @@
 
 class ExprBuilder {
 public:
+    static void RegisterFunctionSignature(const std::string &fnLower, DeclNode *params, ValueNode *retType);
+
+    static void RegisterMethodSignature(const std::string &classLower, const std::string &methodLower, DeclNode *params,
+                                        ValueNode *retType);
+
     // Emits bytecode that leaves ONE com/phpjvm/BasePhpValue on the operand stack.
     static void EmitValue(Class *root, Method *method, AttributeCode *code, const ExprNode *expr);
 

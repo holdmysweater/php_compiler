@@ -3,13 +3,16 @@
 #include "json.hpp"
 #include <string>
 #include <cctype>
+#include <vector>
+
 #include "jvm/class.h"
 #include "jvm/method.h"
 #include "jvm/attribute-code.h"
 #include "jvm/descriptor-field.h"
 #include "jvm/descriptor-method.h"
-#include "core/bytecode/ExprBuilder.h"
 #include "jvm/field.h"
+
+#include "core/bytecode/ExprBuilder.h"
 
 using json = nlohmann::json;
 using namespace jvm;
@@ -49,7 +52,6 @@ static Method *getOrCreateClinit(Class *cls) {
     return m;
 }
 
-
 // PHP namespaces '\' -> JVM '/' and make it case-insensitive like PHP classes
 static std::string toJvmInternalName(std::string s) {
     s = toLowerAscii(s);
@@ -64,7 +66,7 @@ static DescriptorMethod descPhpFunction() {
     // BasePhpValue f(BasePhpValue[] args)
     return DescriptorMethod(
         DescriptorField("com/phpjvm/BasePhpValue"),
-        {DescriptorField("com/phpjvm/BasePhpValue", 1)} // BasePhpValue[]
+        {DescriptorField("com/phpjvm/BasePhpValue", 1)}
     );
 }
 
@@ -115,11 +117,55 @@ static std::vector<DeclNode *> flattenParamList(DeclNode *params) {
     return out;
 }
 
+// Emit: String[] {"int","string",...} for union types.
+// NOTE: This assumes ValueNode has: type == TYPE_ARRAY and `elements` list where each element has `.name`.
+// If your ValueNode differs, adapt this helper.
+static std::vector<std::string> collectTypeNames(ValueNode *vt) {
+    std::vector<std::string> out;
+    if (!vt) return out;
+
+    // Common layout in your JSON: TYPE_ARRAY with elements [{name:"int"}, {name:"string"}]
+    // Try to read vt->elements
+    try {
+        // If your ValueNode has a public `elements` member:
+        // out.push_back(toLowerAscii(el->name));
+        for (auto *el: vt->valueList) {
+            if (!el) continue;
+            if (!el->name.empty()) out.push_back(toLowerAscii(el->name));
+        }
+    } catch (...) {
+        // If your ValueNode is different, you will see this at compile time.
+    }
+    return out;
+}
+
+static void emitStringArrayConst(Class *root, AttributeCode *code, const std::vector<std::string> &items) {
+    auto *stringClass = root->getOrCreateClassConstant("java/lang/String");
+
+    *code << code->PushInt((int32_t) items.size());
+    *code << code->NewArray(stringClass); // String[]
+
+    for (size_t i = 0; i < items.size(); i++) {
+        *code << code->Duplicate(); // arr arr
+        *code << code->PushInt((int32_t) i); // arr arr i
+        *code << code->PushString(items[i]); // arr arr i str
+        *code << code->StoreReferenceToArray(); // arr
+    }
+}
+
+// Binds parameters into locals. For by-ref params, we support globals via marker strings:
+// PhpRuntime.REF_PREFIX + "<hostClassDot>#<fieldName>"
+//
+// Layout we use:
+// - For each parameter:
+///   value slot: BasePhpValue
+//   if by-ref: refDesc slot: java/lang/String (descriptor without prefix)
 static void emitBindParamsFromArgs(
     Class *root,
     Method *m,
     AttributeCode *code,
     DeclNode *params,
+    const std::string &fnName,
     uint16_t argsSlot,
     uint16_t baseLocalSlot
 ) {
@@ -129,18 +175,46 @@ static void emitBindParamsFromArgs(
         DescriptorField("com/phpjvm/BasePhpValue")
     );
 
+    // Runtime helpers
+    auto *requireGlobalRef = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/PhpRuntime",
+        "requireGlobalRef",
+        DescriptorMethod(
+            DescriptorField("java/lang/String"),
+            {
+                DescriptorField("com/phpjvm/BasePhpValue"), DescriptorField("java/lang/String"),
+                DescriptorField("java/lang/String")
+            }
+        )
+    );
+
+    auto *getGlobalRefValue = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/PhpRuntime",
+        "getGlobalRefValue",
+        DescriptorMethod(
+            DescriptorField("com/phpjvm/BasePhpValue"),
+            {DescriptorField("java/lang/String")}
+        )
+    );
+
     std::vector<DeclNode *> ps = flattenParamList(params);
 
-    // Let ExprBuilder know we are in a local scope; locals after params can be allocated starting here.
-    ExprBuilder::BeginLocalScope(m, static_cast<uint16_t>(baseLocalSlot + ps.size()));
+    // We allocate locals for params first, then tell ExprBuilder where locals may continue.
+    uint16_t nextSlot = baseLocalSlot;
 
     for (size_t i = 0; i < ps.size(); i++) {
         DeclNode *p = ps[i];
         const std::string pname = p ? p->name : "";
-        const uint16_t slot = static_cast<uint16_t>(baseLocalSlot + i);
+        const bool byRef = (p && p->hasAddressOperator);
 
-        // Register local name -> slot (so $a loads local slot)
-        ExprBuilder::DefineLocal(m, pname, slot);
+        const uint16_t valueSlot = nextSlot++;
+        uint16_t refDescSlot = 0;
+        if (byRef) {
+            refDescSlot = nextSlot++; // String (descriptor without prefix)
+        }
+
+        // register $param name -> local slot
+        ExprBuilder::DefineLocal(m, pname, valueSlot);
 
         auto *L_missing = code->CodeLabel();
         auto *L_end = code->CodeLabel();
@@ -151,24 +225,130 @@ static void emitBindParamsFromArgs(
         *code << code->PushInt(static_cast<int32_t>(i + 1));
         *code << code->IfWithCompare(Instruction::Compare::LessThan, L_missing);
 
-        // present: slot = args[i]
-        *code << code->LoadReference(argsSlot);
-        *code << code->PushInt(static_cast<int32_t>(i));
-        *code << code->LoadReferenceFromArray();
-        *code << code->StoreReference(slot);
+        // present
+        if (!byRef) {
+            *code << code->LoadReference(argsSlot);
+            *code << code->PushInt(static_cast<int32_t>(i));
+            *code << code->LoadReferenceFromArray();
+            *code << code->StoreReference(valueSlot);
+        } else {
+            // ref param: require marker, store descriptor, load actual referenced value into valueSlot
+            // refDescSlot = PhpRuntime.requireGlobalRef(args[i], fnName, pname)
+            *code << code->LoadReference(argsSlot);
+            *code << code->PushInt(static_cast<int32_t>(i));
+            *code << code->LoadReferenceFromArray(); // BasePhpValue
+
+            *code << code->PushString(fnName);
+            *code << code->PushString(pname);
+            *code << code->InvokeStatic(requireGlobalRef); // String refDesc
+            *code << code->StoreReference(refDescSlot);
+
+            // valueSlot = PhpRuntime.getGlobalRefValue(refDescSlot)
+            *code << code->LoadReference(refDescSlot);
+            *code << code->InvokeStatic(getGlobalRefValue);
+            *code << code->StoreReference(valueSlot);
+        }
+
         *code << code->GoTo(L_end);
 
-        // missing: slot = default or NULL
+        // missing
         *code << L_missing;
-        if (p && p->expr) {
-            ExprBuilder::EmitValue(root, m, code, p->expr);
-        } else {
+        if (byRef) {
+            // no arg for by-ref: treat as NULL local and no writeback
             *code << code->GetStatic(nullValueField);
+            *code << code->StoreReference(valueSlot);
+            *code << code->PushNull();
+            *code << code->StoreReference(refDescSlot);
+        } else {
+            if (p && p->expr) {
+                ExprBuilder::EmitValue(root, m, code, p->expr);
+            } else {
+                *code << code->GetStatic(nullValueField);
+            }
+            *code << code->StoreReference(valueSlot);
         }
-        *code << code->StoreReference(slot);
 
         *code << L_end;
     }
+
+    // Now allow locals after params
+    ExprBuilder::BeginLocalScope(m, nextSlot);
+}
+
+// Flush by-ref params back to globals (copy-out) at function end.
+static void emitFlushByRefParams(
+    Class *root,
+    Method *m,
+    AttributeCode *code,
+    DeclNode *params,
+    uint16_t baseLocalSlot
+) {
+    auto *setGlobalRefValue = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/PhpRuntime",
+        "setGlobalRefValue",
+        DescriptorMethod(
+            std::nullopt,
+            {DescriptorField("java/lang/String"), DescriptorField("com/phpjvm/BasePhpValue")}
+        )
+    );
+
+    std::vector<DeclNode *> ps = flattenParamList(params);
+
+    uint16_t nextSlot = baseLocalSlot;
+    for (size_t i = 0; i < ps.size(); i++) {
+        DeclNode *p = ps[i];
+        const bool byRef = (p && p->hasAddressOperator);
+
+        const uint16_t valueSlot = nextSlot++;
+        uint16_t refDescSlot = 0;
+        if (byRef) refDescSlot = nextSlot++;
+
+        if (!byRef) continue;
+
+        auto *L_skip = code->CodeLabel();
+        auto *L_done = code->CodeLabel();
+
+        // if (refDescSlot == null) skip
+        *code << code->LoadReference(refDescSlot);
+        *code << code->Duplicate();
+        *code << code->IfNull(L_skip);
+        *code << code->PopOne();
+
+        // PhpRuntime.setGlobalRefValue(refDesc, value)
+        *code << code->LoadReference(refDescSlot);
+        *code << code->LoadReference(valueSlot);
+        *code << code->InvokeStatic(setGlobalRefValue);
+        *code << code->GoTo(L_done);
+
+        *code << L_skip;
+        *code << code->PopOne();
+        *code << L_done;
+    }
+}
+
+static bool hasAnyByRefParam(DeclNode *params) {
+    std::vector<DeclNode *> ps = flattenParamList(params);
+    for (auto *p: ps) {
+        if (p && p->hasAddressOperator) return true;
+    }
+    return false;
+}
+
+static uint16_t firstByRefValueSlot(DeclNode *params, uint16_t baseLocalSlot) {
+    std::vector<DeclNode *> ps = flattenParamList(params);
+    uint16_t nextSlot = baseLocalSlot;
+    for (size_t i = 0; i < ps.size(); i++) {
+        DeclNode *p = ps[i];
+        const bool byRef = (p && p->hasAddressOperator);
+        uint16_t valueSlot = nextSlot++;
+        if (byRef) {
+            // skip refdesc slot
+            nextSlot++;
+            return valueSlot;
+        }
+        // if not byRef, continue (no extra slot)
+    }
+    return baseLocalSlot;
 }
 
 static void emitReturnNull(Class *root, AttributeCode *code) {
@@ -183,7 +363,6 @@ static void emitReturnNull(Class *root, AttributeCode *code) {
 }
 
 static void applyVisibility(Method *m, VisibilityType vis) {
-    // remove nothing; just add what you want (your builder likely enforces "only one")
     switch (vis) {
         case VISIBILITY_PUBLIC: m->addFlag(Method::ACC_PUBLIC);
             break;
@@ -218,25 +397,12 @@ string DeclNode::toJson() const {
     j["id"] = GetId();
     j["type"] = toString(type);
 
-    if (!name.empty()) {
-        j["name"] = name;
-    }
+    if (!name.empty()) j["name"] = name;
+    if (!className.empty()) j["className"] = className;
+    if (!classNameExtended.empty()) j["classNameExtended"] = classNameExtended;
 
-    if (!className.empty()) {
-        j["className"] = className;
-    }
-
-    if (!classNameExtended.empty()) {
-        j["classNameExtended"] = classNameExtended;
-    }
-
-    if (isStatic != -1) {
-        j["isStatic"] = isStatic;
-    }
-
-    if (hasAddressOperator) {
-        j["hasAddressOperator"] = hasAddressOperator;
-    }
+    if (isStatic != -1) j["isStatic"] = isStatic;
+    if (hasAddressOperator) j["hasAddressOperator"] = hasAddressOperator;
 
     if (visibilityType != VisibilityType::VISIBILITY_UNKNOWN) {
         j["visibilityType"] = toString(visibilityType);
@@ -250,25 +416,11 @@ string DeclNode::toJson() const {
         j["children"] = childrenArray;
     }
 
-    if (declList != nullptr) {
-        j["declList"] = json::parse(declList->toJson());
-    }
-
-    if (params != nullptr) {
-        j["params"] = json::parse(params->toJson());
-    }
-
-    if (expr != nullptr) {
-        j["expr"] = json::parse(expr->toJson());
-    }
-
-    if (stmt != nullptr) {
-        j["stmt"] = json::parse(stmt->toJson());
-    }
-
-    if (valueType != nullptr) {
-        j["valueType"] = json::parse(valueType->toJson());
-    }
+    if (declList != nullptr) j["declList"] = json::parse(declList->toJson());
+    if (params != nullptr) j["params"] = json::parse(params->toJson());
+    if (expr != nullptr) j["expr"] = json::parse(expr->toJson());
+    if (stmt != nullptr) j["stmt"] = json::parse(stmt->toJson());
+    if (valueType != nullptr) j["valueType"] = json::parse(valueType->toJson());
 
     return j.dump(2);
 }
@@ -288,29 +440,12 @@ string DeclNode::toDot() const {
     label += "\\nID: " + std::to_string(GetId());
 #endif
 
-    if (!name.empty()) {
-        label += "\\nName: " + name;
-    }
-
-    if (!className.empty()) {
-        label += "\\nClass: " + className;
-    }
-
-    if (!classNameExtended.empty()) {
-        label += "\\nExtends: " + classNameExtended;
-    }
-
-    if (isStatic != -1) {
-        label += "\\nStatic: " + std::to_string(isStatic);
-    }
-
-    if (hasAddressOperator) {
-        label += "\\nReference (&)";
-    }
-
-    if (visibilityType != VisibilityType::VISIBILITY_UNKNOWN) {
-        label += "\\nVisibility: " + toSymbol(visibilityType);
-    }
+    if (!name.empty()) label += "\\nName: " + name;
+    if (!className.empty()) label += "\\nClass: " + className;
+    if (!classNameExtended.empty()) label += "\\nExtends: " + classNameExtended;
+    if (isStatic != -1) label += "\\nStatic: " + std::to_string(isStatic);
+    if (hasAddressOperator) label += "\\nReference (&)";
+    if (visibilityType != VisibilityType::VISIBILITY_UNKNOWN) label += "\\nVisibility: " + toSymbol(visibilityType);
 
     std::string::size_type pos = 0;
     while ((pos = label.find('"', pos)) != std::string::npos) {
@@ -374,57 +509,27 @@ bool DeclNode::doSemantics() {
             break;
 
         case DT_CLASS:
-            // Class names are case-insensitive
-            for (char &c: name) {
-                c = tolower(static_cast<unsigned char>(c));
-            }
-
-            // Semantics for declarations of the class
-            if (this->declList != nullptr) {
-                isOk = isOk && this->declList->doSemantics();
-            } else {
-                Log("skipped decl list");
-            }
-
+            for (char &c: name) c = tolower(static_cast<unsigned char>(c));
+            if (declList != nullptr) isOk = isOk && declList->doSemantics();
             break;
 
         case DT_PROPERTY:
-            // TODO property logic
             Warn("DT_PROPERTY not implemented");
             break;
 
         case DT_PARAMETER:
-            if (expr != nullptr) {
-                expr->doSemantics();
-            }
+            if (expr != nullptr) expr->doSemantics();
             break;
 
         case DT_CONSTANT:
-            // TODO const logic
             Warn("DT_CONSTANT not implemented");
             break;
 
         case DT_FUNCTION:
         case DT_METHOD:
-            // Function names are case-insensitive
-            for (char &c: name) {
-                c = tolower(static_cast<unsigned char>(c));
-            }
-
-            // Semantics for parameters
-            if (this->params != nullptr) {
-                isOk = isOk && this->params->doSemantics();
-            } else {
-                Log("skipped params");
-            }
-
-            // Semantics for body
-            if (this->stmt != nullptr) {
-                isOk = isOk && this->stmt->doSemantics();
-            } else {
-                Log("skipped body (no stmt)");
-            }
-
+            for (char &c: name) c = tolower(static_cast<unsigned char>(c));
+            if (params != nullptr) isOk = isOk && params->doSemantics();
+            if (stmt != nullptr) isOk = isOk && stmt->doSemantics();
             break;
 
         default:
@@ -432,11 +537,8 @@ bool DeclNode::doSemantics() {
             return false;
     }
 
-    if (isOk) {
-        Log("finished semantics for " + toString(type) + "");
-    } else {
-        Error("semantics for " + toString(type) + " failed");
-    }
+    if (isOk) Log("finished semantics for " + toString(type) + "");
+    else Error("semantics for " + toString(type) + " failed");
 
     return isOk;
 }
@@ -466,13 +568,8 @@ Class *DeclNode::processClass(Class *root, std::vector<Class *> &list) {
 
             emitDefaultCtor(cls);
 
-            // Generate class members into cls
-            if (declList) {
-                declList->processClass(cls, list);
-            }
+            if (declList) declList->processClass(cls, list);
 
-            // IMPORTANT: ensure <clinit> ends with RETURN if it exists / was used.
-            // Safest approach: always create it and just return if it's empty.
             {
                 Method *clinit = getOrCreateClinit(cls);
                 AttributeCode *cc = clinit->getCodeAttribute();
@@ -486,29 +583,43 @@ Class *DeclNode::processClass(Class *root, std::vector<Class *> &list) {
         case DT_FUNCTION: {
             std::string fn = toLowerAscii(name);
 
+            // Register signature (params types + byref, return types) for call-site checks.
+            ExprBuilder::RegisterFunctionSignature(fn, params, valueType);
+
             Method *m = root->getOrCreateMethod(fn, descPhpFunction());
             m->addFlag(Method::ACC_PUBLIC);
             m->addFlag(Method::ACC_STATIC);
 
             AttributeCode *code = m->getCodeAttribute();
 
-            // args is local slot 0 in static function signature: (BasePhpValue[] args)
-            // params will be stored starting at local slot 1
-            emitBindParamsFromArgs(root, m, code, params, /*argsSlot*/0, /*baseLocalSlot*/1);
+            // args in slot 0, params from slot 1 (with extra slots for by-ref descriptors)
+            emitBindParamsFromArgs(root, m, code, params, fn, /*argsSlot*/0, /*baseLocalSlot*/1);
 
             if (stmt) {
                 stmt->addStmt(root, m, code);
             }
 
-            emitReturnNull(root, code);
+            // Copy-out by-ref params (works for your example even with no explicit return)
+            emitFlushByRefParams(root, m, code, params, /*baseLocalSlot*/1);
 
-            // Important: end scope so future methods don't see these locals
+            if (hasAnyByRefParam(params)) {
+                uint16_t slot = firstByRefValueSlot(params, /*baseLocalSlot*/1);
+                *code << code->LoadReference(slot);
+                *code << code->ReturnReference();
+            } else {
+                emitReturnNull(root, code);
+            }
+
             ExprBuilder::EndLocalScope(m);
             break;
         }
 
         case DT_METHOD: {
             std::string mn = toLowerAscii(name);
+
+            // Key methods as "class::method" (lowercased) for call-site checks later (optional)
+            std::string owner = toLowerAscii(root->getClassName());
+            ExprBuilder::RegisterMethodSignature(owner, mn, params, valueType);
 
             const bool phpStatic = (isStatic == 1);
             DescriptorMethod sig = phpStatic ? descPhpStaticMethod() : descPhpInstanceMethod();
@@ -520,31 +631,33 @@ Class *DeclNode::processClass(Class *root, std::vector<Class *> &list) {
 
             AttributeCode *code = m->getCodeAttribute();
 
-            // For both class-static and instance methods, args is in local slot 1:
-            //   instance: (PhpObject self, BasePhpValue[] args)
-            //   static:   (PhpClass calledClass, BasePhpValue[] args)
-            // baseLocalSlot = 2 because slot0 + slot1 are occupied.
-            emitBindParamsFromArgs(root, m, code, params, /*argsSlot*/1, /*baseLocalSlot*/2);
+            // args is in slot 1, params from slot 2
+            emitBindParamsFromArgs(root, m, code, params, owner + "::" + mn, /*argsSlot*/1, /*baseLocalSlot*/2);
 
             if (stmt) {
                 stmt->addStmt(root, m, code);
             }
 
-            emitReturnNull(root, code);
+            emitFlushByRefParams(root, m, code, params, /*baseLocalSlot*/2);
+
+            if (hasAnyByRefParam(params)) {
+                uint16_t slot = firstByRefValueSlot(params, /*baseLocalSlot*/2);
+                *code << code->LoadReference(slot);
+                *code << code->ReturnReference();
+            } else {
+                emitReturnNull(root, code);
+            }
 
             ExprBuilder::EndLocalScope(m);
             break;
         }
 
         case DT_CONSTANT: {
-            // We are inside a *class* here: `root` is the class being built.
-            // Create: public static BasePhpValue X;
             std::string fieldName = sanitizeJavaMemberIdent(name);
 
             Field *f = root->getOrCreateField(fieldName, DescriptorField("com/phpjvm/BasePhpValue"));
             f->addFlag(Field::ACC_PUBLIC);
             f->addFlag(Field::ACC_STATIC);
-            // optional: f->addFlag(Field::ACC_FINAL);
 
             auto *fieldRef = root->getOrCreateFieldrefConstant(
                 root->getClassName(),
@@ -552,18 +665,11 @@ Class *DeclNode::processClass(Class *root, std::vector<Class *> &list) {
                 DescriptorField("com/phpjvm/BasePhpValue")
             );
 
-            // Emit initialization into <clinit>:
-            // <clinit>:
-            //   <push value>  (BasePhpValue)
-            //   putstatic X
             Method *clinit = getOrCreateClinit(root);
             AttributeCode *cc = clinit->getCodeAttribute();
 
-            // IMPORTANT: DON'T use stmt->addStmt here; just emit the expression value.
-            // ExprBuilder already returns BasePhpValue on stack.
             ExprBuilder::EmitValue(root, clinit, cc, expr);
             *cc << cc->PutStatic(fieldRef);
-
             break;
         }
 
@@ -577,11 +683,8 @@ Class *DeclNode::processClass(Class *root, std::vector<Class *> &list) {
             break;
     }
 
-    if (isOk) {
-        Log("finished semantics for " + toString(type) + "");
-    } else {
-        Error("semantics for " + toString(type) + " failed");
-    }
+    if (isOk) Log("finished semantics for " + toString(type) + "");
+    else Error("semantics for " + toString(type) + " failed");
 
     return root;
 }

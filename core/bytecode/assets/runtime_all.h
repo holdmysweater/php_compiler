@@ -12,5 +12,7 @@
 #include "PhpClass_class.h"
 #include "PhpMethod_class.h"
 #include "PhpObject_class.h"
+#include "PhpRef_class.h"
+#include "PhpRuntime$StaticFieldRef_class.h"
 #include "PhpRuntime_class.h"
 #include "PhpStaticMethod_class.h"
