@@ -8,6 +8,8 @@
 #include "jvm/attribute-code.h"
 #include "jvm/descriptor-field.h"
 #include "jvm/descriptor-method.h"
+#include "core/bytecode/ExprBuilder.h"
+#include "jvm/field.h"
 
 using json = nlohmann::json;
 using namespace jvm;
@@ -16,6 +18,37 @@ static std::string toLowerAscii(std::string s) {
     for (char &c: s) c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
     return s;
 }
+
+// Add near the top of DeclNode.cpp (helpers)
+static std::string sanitizeJavaMemberIdent(const std::string &raw) {
+    std::string s = raw;
+    if (!s.empty() && s[0] == '$') s.erase(s.begin());
+
+    std::string out;
+    out.reserve(s.size() + 2);
+
+    for (char c: s) {
+        if ((c >= 'a' && c <= 'z') ||
+            (c >= 'A' && c <= 'Z') ||
+            (c >= '0' && c <= '9') ||
+            c == '_') {
+            out.push_back(c);
+        } else {
+            out.push_back('_');
+        }
+    }
+
+    if (out.empty()) out = "member";
+    if (out[0] >= '0' && out[0] <= '9') out.insert(out.begin(), '_');
+    return out;
+}
+
+static Method *getOrCreateClinit(Class *cls) {
+    Method *m = cls->getOrCreateMethod("<clinit>", DescriptorMethod(std::nullopt, {}));
+    m->addFlag(Method::ACC_STATIC);
+    return m;
+}
+
 
 // PHP namespaces '\' -> JVM '/' and make it case-insensitive like PHP classes
 static std::string toJvmInternalName(std::string s) {
@@ -89,6 +122,19 @@ static void applyVisibility(Method *m, VisibilityType vis) {
         case VISIBILITY_PROTECTED: m->addFlag(Method::ACC_PROTECTED);
             break;
         default: m->addFlag(Method::ACC_PUBLIC);
+            break;
+    }
+}
+
+static void applyVisibility(Field *f, VisibilityType vis) {
+    switch (vis) {
+        case VISIBILITY_PUBLIC: f->addFlag(Field::ACC_PUBLIC);
+            break;
+        case VISIBILITY_PRIVATE: f->addFlag(Field::ACC_PRIVATE);
+            break;
+        case VISIBILITY_PROTECTED: f->addFlag(Field::ACC_PROTECTED);
+            break;
+        default: f->addFlag(Field::ACC_PUBLIC);
             break;
     }
 }
@@ -334,7 +380,6 @@ Class *DeclNode::processClass(Class *root, std::vector<Class *> &list) {
         }
 
         case DT_CLASS: {
-            // create a new JVM class for the PHP class
             std::string clsName = toJvmInternalName(name);
             std::string parentName = classNameExtended.empty()
                                          ? "java/lang/Object"
@@ -346,21 +391,24 @@ Class *DeclNode::processClass(Class *root, std::vector<Class *> &list) {
 
             emitDefaultCtor(cls);
 
-            // generate class members into cls
+            // Generate class members into cls
             if (declList) {
                 declList->processClass(cls, list);
             }
 
-            // emit class file separately
-            list.push_back(cls);
+            // IMPORTANT: ensure <clinit> ends with RETURN if it exists / was used.
+            // Safest approach: always create it and just return if it's empty.
+            {
+                Method *clinit = getOrCreateClinit(cls);
+                AttributeCode *cc = clinit->getCodeAttribute();
+                *cc << cc->ReturnVoid();
+            }
 
-            // continue compiling in original root (program class)
+            list.push_back(cls);
             break;
         }
 
         case DT_FUNCTION: {
-            // global function on current root:
-            // BasePhpValue name(BasePhpValue[] args)
             std::string fn = toLowerAscii(name);
 
             Method *m = root->getOrCreateMethod(fn, descPhpFunction());
@@ -370,17 +418,14 @@ Class *DeclNode::processClass(Class *root, std::vector<Class *> &list) {
             AttributeCode *code = m->getCodeAttribute();
 
             if (stmt) {
-                // IMPORTANT: don't call stmt->processClass (it creates main)
                 stmt->addStmt(root, m, code);
             }
 
-            // until ST_RETURN is implemented everywhere
             emitReturnNull(root, code);
             break;
         }
 
         case DT_METHOD: {
-            // method inside a class
             std::string mn = toLowerAscii(name);
 
             const bool phpStatic = (isStatic == 1);
@@ -401,8 +446,38 @@ Class *DeclNode::processClass(Class *root, std::vector<Class *> &list) {
             break;
         }
 
+        case DT_CONSTANT: {
+            // We are inside a *class* here: `root` is the class being built.
+            // Create: public static BasePhpValue X;
+            std::string fieldName = sanitizeJavaMemberIdent(name);
+
+            Field *f = root->getOrCreateField(fieldName, DescriptorField("com/phpjvm/BasePhpValue"));
+            f->addFlag(Field::ACC_PUBLIC);
+            f->addFlag(Field::ACC_STATIC);
+            // optional: f->addFlag(Field::ACC_FINAL);
+
+            auto *fieldRef = root->getOrCreateFieldrefConstant(
+                root->getClassName(),
+                fieldName,
+                DescriptorField("com/phpjvm/BasePhpValue")
+            );
+
+            // Emit initialization into <clinit>:
+            // <clinit>:
+            //   <push value>  (BasePhpValue)
+            //   putstatic X
+            Method *clinit = getOrCreateClinit(root);
+            AttributeCode *cc = clinit->getCodeAttribute();
+
+            // IMPORTANT: DON'T use stmt->addStmt here; just emit the expression value.
+            // ExprBuilder already returns BasePhpValue on stack.
+            ExprBuilder::EmitValue(root, clinit, cc, expr);
+            *cc << cc->PutStatic(fieldRef);
+
+            break;
+        }
+
         case DT_PROPERTY:
-        case DT_CONSTANT:
         case DT_PARAMETER:
             Warn("DeclNode::processClass: " + toString(type) + " not implemented yet");
             break;

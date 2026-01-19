@@ -17,6 +17,21 @@ static const ExprNode *childOrNull(const ExprNode *e, size_t i) {
     return e->children[i];
 }
 
+static std::string toLowerAscii(std::string s) {
+    for (char &c: s) c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
+    return s;
+}
+
+// PHP namespaces '\' -> JVM '/' and make it case-insensitive like PHP classes
+static std::string toJvmInternalNameExpr(std::string s) {
+    s = toLowerAscii(s);
+    for (char &c: s) {
+        if (c == '\\') c = '/';
+    }
+    while (!s.empty() && s.front() == '/') s.erase(s.begin());
+    return s;
+}
+
 static void emitBinary(
     Class *root,
     Method *method,
@@ -1265,6 +1280,45 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
                 *code << code->PutStatic(fieldRef); // new
                 return;
             }
+        }
+
+        case ExprType::ET_STATIC_PROPERTY_ACCESS: {
+            const ExprNode *classExpr = childOrNull(expr, 0);
+            const ExprNode *nameExpr = childOrNull(expr, 1);
+
+            std::string clsName = idText(classExpr);
+            std::string member = idText(nameExpr);
+
+            if (clsName.empty() || member.empty()) {
+                Console::Warning("ET_STATIC_PROPERTY_ACCESS: missing class or member (pushing NULL)");
+                *code << code->GetStatic(nullValueField);
+                return;
+            }
+
+            // Your DeclNode lowercases JVM class names (PHP class names are case-insensitive)
+            std::string owner = toJvmInternalNameExpr(clsName); // <- use the helper above
+            // NOTE: constants/fields ARE case-sensitive, so keep member as-is ("X")
+
+            auto *fieldRef = root->getOrCreateFieldrefConstant(
+                owner,
+                member,
+                DescriptorField("com/phpjvm/BasePhpValue")
+            );
+
+            // Load static; if null -> BasePhpValue.NULL_VALUE (safety)
+            auto *L_nonNull = code->CodeLabel();
+            auto *L_end = code->CodeLabel();
+
+            *code << code->GetStatic(fieldRef); // v
+            *code << code->Duplicate(); // v v
+            *code << code->IfNotNull(L_nonNull); // pops one v; stack: v
+            *code << code->PopOne(); // pop null
+            *code << code->GetStatic(nullValueField);
+            *code << code->GoTo(L_end);
+
+            *code << L_nonNull;
+            *code << L_end;
+            return;
         }
 
         default:
