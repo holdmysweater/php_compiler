@@ -941,13 +941,13 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
             std::string var = idText(id);
 
             uint16_t localIndex = 0;
-            if (ExprBuilder::TryGetLocal(method, var, localIndex)) {
-                // Local variable (function param / local)
+
+            if (allocLocalIfInScope(method, var, localIndex)) {
                 emitLoadLocalVar(code, localIndex, nullValueField);
                 return;
             }
 
-            // Global variable (static field on program class)
+            // Not in a local scope => global
             auto *fieldRef = ensureGlobalVarField(root, var);
             emitLoadGlobalVar(root, code, fieldRef, nullValueField);
             return;
@@ -962,15 +962,16 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
                 std::string var = idText(id);
 
                 uint16_t localIndex = 0;
-                if (ExprBuilder::TryGetLocal(method, var, localIndex)) {
-                    // local assignment
+
+                // If in local scope => assign local (alloc if first assignment)
+                if (allocLocalIfInScope(method, var, localIndex)) {
                     EmitValue(root, method, code, rhs);
                     *code << code->Duplicate();
                     *code << code->StoreReference(localIndex);
                     return;
                 }
 
-                // global assignment
+                // Otherwise assign global
                 auto *fieldRef = ensureGlobalVarField(root, var);
                 EmitValue(root, method, code, rhs);
                 *code << code->Duplicate();
@@ -1394,7 +1395,7 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
             std::string var = idText(id);
 
             uint16_t localIndex = 0;
-            bool isLocal = ExprBuilder::TryGetLocal(method, var, localIndex);
+            bool isLocal = allocLocalIfInScope(method, var, localIndex);
 
             if (isLocal) {
                 emitLoadLocalVar(code, localIndex, nullValueField);
@@ -1462,7 +1463,7 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
             std::string var = idText(id);
 
             uint16_t localIndex = 0;
-            bool isLocal = ExprBuilder::TryGetLocal(method, var, localIndex);
+            bool isLocal = allocLocalIfInScope(method, var, localIndex);
             auto *fieldRef = isLocal ? nullptr : ensureGlobalVarField(root, var);
 
             bool isInc =
