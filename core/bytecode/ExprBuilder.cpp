@@ -146,6 +146,25 @@ static ConstantFieldref *ensureGlobalVarField(Class *root, const std::string &va
     );
 }
 
+static void emitLoadLocalVar(
+    AttributeCode *code,
+    uint16_t slot,
+    ConstantFieldref *nullValueField
+) {
+    auto *L_nonNull = code->CodeLabel();
+    auto *L_end = code->CodeLabel();
+
+    *code << code->LoadReference(slot);
+    *code << code->Duplicate();
+    *code << code->IfNotNull(L_nonNull);
+    *code << code->PopOne();
+    *code << code->GetStatic(nullValueField);
+    *code << code->GoTo(L_end);
+
+    *code << L_nonNull;
+    *code << L_end;
+}
+
 // pushes current value of $var (NULL_VALUE if field is null)
 static void emitLoadGlobalVar(
     Class *root,
@@ -920,30 +939,17 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
         case ExprType::ET_SIGIL: {
             const ExprNode *id = childOrNull(expr, 0);
             std::string var = idText(id);
-            std::string fieldName = sanitizeJavaIdent(var);
 
-            Field *f = root->getOrCreateField(fieldName, DescriptorField("com/phpjvm/BasePhpValue"));
-            f->addFlag(Field::ACC_PUBLIC);
-            f->addFlag(Field::ACC_STATIC);
+            uint16_t localIndex = 0;
+            if (ExprBuilder::TryGetLocal(method, var, localIndex)) {
+                // Local variable (function param / local)
+                emitLoadLocalVar(code, localIndex, nullValueField);
+                return;
+            }
 
-            auto *fieldRef = root->getOrCreateFieldrefConstant(
-                root->getClassName(),
-                fieldName,
-                DescriptorField("com/phpjvm/BasePhpValue")
-            );
-
-            auto *L_nonNull = code->CodeLabel();
-            auto *L_end = code->CodeLabel();
-
-            *code << code->GetStatic(fieldRef);
-            *code << code->Duplicate();
-            *code << code->IfNotNull(L_nonNull);
-            *code << code->PopOne();
-            *code << code->GetStatic(nullValueField);
-            *code << code->GoTo(L_end);
-
-            *code << L_nonNull;
-            *code << L_end;
+            // Global variable (static field on program class)
+            auto *fieldRef = ensureGlobalVarField(root, var);
+            emitLoadGlobalVar(root, code, fieldRef, nullValueField);
             return;
         }
 
@@ -954,18 +960,18 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
             if (lhs && lhs->type == ExprType::ET_SIGIL) {
                 const ExprNode *id = childOrNull(lhs, 0);
                 std::string var = idText(id);
-                std::string fieldName = sanitizeJavaIdent(var);
 
-                Field *f = root->getOrCreateField(fieldName, DescriptorField("com/phpjvm/BasePhpValue"));
-                f->addFlag(Field::ACC_PUBLIC);
-                f->addFlag(Field::ACC_STATIC);
+                uint16_t localIndex = 0;
+                if (ExprBuilder::TryGetLocal(method, var, localIndex)) {
+                    // local assignment
+                    EmitValue(root, method, code, rhs);
+                    *code << code->Duplicate();
+                    *code << code->StoreReference(localIndex);
+                    return;
+                }
 
-                auto *fieldRef = root->getOrCreateFieldrefConstant(
-                    root->getClassName(),
-                    fieldName,
-                    DescriptorField("com/phpjvm/BasePhpValue")
-                );
-
+                // global assignment
+                auto *fieldRef = ensureGlobalVarField(root, var);
                 EmitValue(root, method, code, rhs);
                 *code << code->Duplicate();
                 *code << code->PutStatic(fieldRef);
@@ -1386,9 +1392,17 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
 
             const ExprNode *id = childOrNull(lhs, 0);
             std::string var = idText(id);
-            auto *fieldRef = ensureGlobalVarField(root, var);
 
-            emitLoadGlobalVar(root, code, fieldRef, nullValueField);
+            uint16_t localIndex = 0;
+            bool isLocal = ExprBuilder::TryGetLocal(method, var, localIndex);
+
+            if (isLocal) {
+                emitLoadLocalVar(code, localIndex, nullValueField);
+            } else {
+                auto *fieldRef = ensureGlobalVarField(root, var);
+                emitLoadGlobalVar(root, code, fieldRef, nullValueField);
+            }
+
             EmitValue(root, method, code, rhs);
 
             ConstantMethodref *op = nullptr;
@@ -1422,7 +1436,13 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
 
             *code << code->InvokeStatic(op);
             *code << code->Duplicate();
-            *code << code->PutStatic(fieldRef);
+
+            if (isLocal) {
+                *code << code->StoreReference(localIndex);
+            } else {
+                auto *fieldRef = ensureGlobalVarField(root, var);
+                *code << code->PutStatic(fieldRef);
+            }
             return;
         }
 
@@ -1440,7 +1460,10 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
 
             const ExprNode *id = childOrNull(lhs, 0);
             std::string var = idText(id);
-            auto *fieldRef = ensureGlobalVarField(root, var);
+
+            uint16_t localIndex = 0;
+            bool isLocal = ExprBuilder::TryGetLocal(method, var, localIndex);
+            auto *fieldRef = isLocal ? nullptr : ensureGlobalVarField(root, var);
 
             bool isInc =
                     (expr->type == ExprType::ET_INCREMENT_PRE) ||
@@ -1450,28 +1473,41 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
                     (expr->type == ExprType::ET_INCREMENT_POST) ||
                     (expr->type == ExprType::ET_DECREMENT_POST);
 
+            auto loadVar = [&]() {
+                if (isLocal) emitLoadLocalVar(code, localIndex, nullValueField);
+                else emitLoadGlobalVar(root, code, fieldRef, nullValueField);
+            };
+
+            auto storeVar = [&]() {
+                if (isLocal) {
+                    *code << code->StoreReference(localIndex);
+                } else {
+                    *code << code->PutStatic(fieldRef);
+                }
+            };
+
             if (isPost) {
-                emitLoadGlobalVar(root, code, fieldRef, nullValueField);
-                *code << code->Duplicate();
+                loadVar(); // old
+                *code << code->Duplicate(); // old old
 
                 *code << code->PushLong(1);
                 *code << code->InvokeStatic(ofLong);
 
-                *code << code->InvokeStatic(isInc ? add : sub);
+                *code << code->InvokeStatic(isInc ? add : sub); // old new
 
-                *code << code->Duplicate();
-                *code << code->PutStatic(fieldRef);
-                *code << code->PopOne();
+                *code << code->Duplicate(); // old new new
+                storeVar(); // store new
+                *code << code->PopOne(); // drop new, leave old
                 return;
             } else {
-                emitLoadGlobalVar(root, code, fieldRef, nullValueField);
+                loadVar();
 
                 *code << code->PushLong(1);
                 *code << code->InvokeStatic(ofLong);
 
-                *code << code->InvokeStatic(isInc ? add : sub);
+                *code << code->InvokeStatic(isInc ? add : sub); // new
                 *code << code->Duplicate();
-                *code << code->PutStatic(fieldRef);
+                storeVar();
                 return;
             }
         }
