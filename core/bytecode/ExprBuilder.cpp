@@ -8,8 +8,77 @@
 #include "jvm/descriptor-field.h"
 #include "jvm/descriptor-method.h"
 #include "jvm/field.h"
+#include <unordered_map>
+#include <utility>
 
 using namespace jvm;
+
+struct LocalScopeInfo {
+    std::unordered_map<std::string, uint16_t> slots;
+    uint16_t nextFree = 0;
+};
+
+static std::unordered_map<const jvm::Method *, LocalScopeInfo> g_localScopes;
+
+static std::string normalizeVarName(std::string s) {
+    if (!s.empty() && s[0] == '$') s.erase(s.begin());
+    return s;
+}
+
+void ExprBuilder::BeginLocalScope(jvm::Method *method, uint16_t nextFreeLocal) {
+    if (!method) return;
+    LocalScopeInfo info;
+    info.nextFree = nextFreeLocal;
+    g_localScopes[method] = std::move(info);
+}
+
+void ExprBuilder::DefineLocal(jvm::Method *method, const std::string &varName, uint16_t localIndex) {
+    if (!method) return;
+    auto it = g_localScopes.find(method);
+    if (it == g_localScopes.end()) return;
+    it->second.slots[normalizeVarName(varName)] = localIndex;
+    if (localIndex >= it->second.nextFree) it->second.nextFree = static_cast<uint16_t>(localIndex + 1);
+}
+
+bool ExprBuilder::TryGetLocal(jvm::Method *method, const std::string &varName, uint16_t &outIndex) {
+    if (!method) return false;
+    auto it = g_localScopes.find(method);
+    if (it == g_localScopes.end()) return false;
+
+    auto key = normalizeVarName(varName);
+    auto jt = it->second.slots.find(key);
+    if (jt == it->second.slots.end()) return false;
+
+    outIndex = jt->second;
+    return true;
+}
+
+void ExprBuilder::EndLocalScope(jvm::Method *method) {
+    if (!method) return;
+    g_localScopes.erase(method);
+}
+
+// Allocate a new local slot for a variable name if we are in a local scope.
+// Returns true if allocated, false if not in local scope.
+static bool allocLocalIfInScope(jvm::Method *method, const std::string &varName, uint16_t &outIndex) {
+    auto it = g_localScopes.find(method);
+    if (it == g_localScopes.end()) return false;
+
+    const std::string key = normalizeVarName(varName);
+
+    // already exists?
+    auto jt = it->second.slots.find(key);
+    if (jt != it->second.slots.end()) {
+        outIndex = jt->second;
+        return true;
+    }
+
+    // allocate
+    outIndex = it->second.nextFree;
+    it->second.nextFree = static_cast<uint16_t>(it->second.nextFree + 1);
+    it->second.slots[key] = outIndex;
+    return true;
+}
 
 static const ExprNode *childOrNull(const ExprNode *e, size_t i) {
     if (!e) return nullptr;
@@ -751,9 +820,28 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
         case ExprType::ET_SIGIL: {
             const ExprNode *id = childOrNull(expr, 0);
             std::string var = idText(id);
+
+            // If we are inside a function/method local scope and this var is known -> load local
+            uint16_t localIndex = 0;
+            if (ExprBuilder::TryGetLocal(method, var, localIndex)) {
+                auto *L_nonNull = code->CodeLabel();
+                auto *L_end = code->CodeLabel();
+
+                *code << code->LoadReference(localIndex); // v
+                *code << code->Duplicate(); // v v
+                *code << code->IfNotNull(L_nonNull); // pops one v; stack: v
+                *code << code->PopOne(); // pop null
+                *code << code->GetStatic(nullValueField); // NULL_VALUE
+                *code << code->GoTo(L_end);
+
+                *code << L_nonNull;
+                *code << L_end;
+                return;
+            }
+
+            // Otherwise fallback to global static field behavior
             std::string fieldName = sanitizeJavaIdent(var);
 
-            // Ensure field exists: public static BasePhpValue g_x;
             Field *f = root->getOrCreateField(fieldName, DescriptorField("com/phpjvm/BasePhpValue"));
             f->addFlag(Field::ACC_PUBLIC);
             f->addFlag(Field::ACC_STATIC);
@@ -764,18 +852,17 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
                 DescriptorField("com/phpjvm/BasePhpValue")
             );
 
-            // Load static; if null -> BasePhpValue.NULL_VALUE
             auto *L_nonNull = code->CodeLabel();
             auto *L_end = code->CodeLabel();
 
             *code << code->GetStatic(fieldRef); // v
             *code << code->Duplicate(); // v v
-            *code << code->IfNotNull(L_nonNull); // pops one v; stack: v
+            *code << code->IfNotNull(L_nonNull);
             *code << code->PopOne(); // pop null
-            *code << code->GetStatic(nullValueField); // push NULL_VALUE
+            *code << code->GetStatic(nullValueField);
             *code << code->GoTo(L_end);
 
-            *code << L_nonNull; // stack: v (non-null)
+            *code << L_nonNull;
             *code << L_end;
             return;
         }
@@ -788,6 +875,17 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
             if (lhs && lhs->type == ExprType::ET_SIGIL) {
                 const ExprNode *id = childOrNull(lhs, 0);
                 std::string var = idText(id);
+
+                // Prefer local if in scope (or allocate local if in scope)
+                uint16_t localIndex = 0;
+                if (ExprBuilder::TryGetLocal(method, var, localIndex) || allocLocalIfInScope(method, var, localIndex)) {
+                    EmitValue(root, method, code, rhs); // value
+                    *code << code->Duplicate(); // value value
+                    *code << code->StoreReference(localIndex); // value
+                    return;
+                }
+
+                // Otherwise global
                 std::string fieldName = sanitizeJavaIdent(var);
 
                 Field *f = root->getOrCreateField(fieldName, DescriptorField("com/phpjvm/BasePhpValue"));
@@ -800,9 +898,9 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
                     DescriptorField("com/phpjvm/BasePhpValue")
                 );
 
-                EmitValue(root, method, code, rhs); // value
-                *code << code->Duplicate(); // value value
-                *code << code->PutStatic(fieldRef); // value
+                EmitValue(root, method, code, rhs);
+                *code << code->Duplicate();
+                *code << code->PutStatic(fieldRef);
                 return;
             }
 
@@ -1171,15 +1269,7 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
 
             const ExprNode *id = childOrNull(lhs, 0);
             std::string var = idText(id);
-            auto *fieldRef = ensureGlobalVarField(root, var);
 
-            // current
-            emitLoadGlobalVar(root, code, fieldRef, nullValueField);
-
-            // rhs
-            EmitValue(root, method, code, rhs);
-
-            // op
             ConstantMethodref *op = nullptr;
             switch (expr->type) {
                 case ExprType::ET_PLUS_ASSIGN: op = add;
@@ -1209,9 +1299,30 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
                 return;
             }
 
-            *code << code->InvokeStatic(op); // newValue
-            *code << code->Duplicate(); // newValue newValue
-            *code << code->PutStatic(fieldRef); // newValue
+            // Local?
+            uint16_t localIndex = 0;
+            if (ExprBuilder::TryGetLocal(method, var, localIndex)) {
+                // load current
+                *code << code->LoadReference(localIndex);
+                // rhs
+                EmitValue(root, method, code, rhs);
+                // apply op
+                *code << code->InvokeStatic(op);
+                // store + return value
+                *code << code->Duplicate();
+                *code << code->StoreReference(localIndex);
+                return;
+            }
+
+            // Global fallback
+            auto *fieldRef = ensureGlobalVarField(root, var);
+            emitLoadGlobalVar(root, code, fieldRef, nullValueField);
+
+            EmitValue(root, method, code, rhs);
+
+            *code << code->InvokeStatic(op);
+            *code << code->Duplicate();
+            *code << code->PutStatic(fieldRef);
             return;
         }
 
@@ -1229,7 +1340,6 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
 
             const ExprNode *id = childOrNull(lhs, 0);
             std::string var = idText(id);
-            auto *fieldRef = ensureGlobalVarField(root, var);
 
             bool isInc =
                     (expr->type == ExprType::ET_INCREMENT_PRE) ||
@@ -1239,21 +1349,43 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
                     (expr->type == ExprType::ET_INCREMENT_POST) ||
                     (expr->type == ExprType::ET_DECREMENT_POST);
 
-            if (isPost) {
-                // We must return the OLD value, but store NEW into the variable.
-                // Desired stack evolution:
-                // old
-                // old old
-                // old old one
-                // old new
-                // old new new
-                // (store) old new
-                // pop -> old
+            // Local?
+            uint16_t localIndex = 0;
+            if (ExprBuilder::TryGetLocal(method, var, localIndex)) {
+                if (isPost) {
+                    *code << code->LoadReference(localIndex); // old
+                    *code << code->Duplicate(); // old old
 
+                    *code << code->PushLong(1);
+                    *code << code->InvokeStatic(ofLong); // old old one
+
+                    *code << code->InvokeStatic(isInc ? add : sub); // old new
+
+                    *code << code->Duplicate(); // old new new
+                    *code << code->StoreReference(localIndex); // old new
+                    *code << code->PopOne(); // old
+                    return;
+                } else {
+                    *code << code->LoadReference(localIndex); // old
+
+                    *code << code->PushLong(1);
+                    *code << code->InvokeStatic(ofLong); // old one
+
+                    *code << code->InvokeStatic(isInc ? add : sub); // new
+                    *code << code->Duplicate(); // new new
+                    *code << code->StoreReference(localIndex); // new
+                    return;
+                }
+            }
+
+            // Global fallback
+            auto *fieldRef = ensureGlobalVarField(root, var);
+
+            if (isPost) {
                 emitLoadGlobalVar(root, code, fieldRef, nullValueField); // old
                 *code << code->Duplicate(); // old old
 
-                *code << code->PushLong(1); // old old 1
+                *code << code->PushLong(1);
                 *code << code->InvokeStatic(ofLong); // old old one
 
                 *code << code->InvokeStatic(isInc ? add : sub); // old new
@@ -1263,21 +1395,14 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
                 *code << code->PopOne(); // old
                 return;
             } else {
-                // Pre: return NEW value (and store it).
-                // old
-                // old one
-                // new
-                // new new
-                // (store) new
-
                 emitLoadGlobalVar(root, code, fieldRef, nullValueField); // old
 
-                *code << code->PushLong(1); // old 1
+                *code << code->PushLong(1);
                 *code << code->InvokeStatic(ofLong); // old one
 
                 *code << code->InvokeStatic(isInc ? add : sub); // new
-                *code << code->Duplicate(); // new new
-                *code << code->PutStatic(fieldRef); // new
+                *code << code->Duplicate();
+                *code << code->PutStatic(fieldRef);
                 return;
             }
         }

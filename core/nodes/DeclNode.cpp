@@ -101,6 +101,76 @@ static void emitDefaultCtor(Class *cls) {
     *code << code->ReturnVoid();
 }
 
+static std::vector<DeclNode *> flattenParamList(DeclNode *params) {
+    std::vector<DeclNode *> out;
+    if (!params) return out;
+
+    if (params->type == DT_LIST) {
+        for (auto *ch: params->children) {
+            if (ch && ch->type == DT_PARAMETER) out.push_back(ch);
+        }
+    } else if (params->type == DT_PARAMETER) {
+        out.push_back(params);
+    }
+    return out;
+}
+
+static void emitBindParamsFromArgs(
+    Class *root,
+    Method *m,
+    AttributeCode *code,
+    DeclNode *params,
+    uint16_t argsSlot,
+    uint16_t baseLocalSlot
+) {
+    auto *nullValueField = root->getOrCreateFieldrefConstant(
+        "com/phpjvm/BasePhpValue",
+        "NULL_VALUE",
+        DescriptorField("com/phpjvm/BasePhpValue")
+    );
+
+    std::vector<DeclNode *> ps = flattenParamList(params);
+
+    // Let ExprBuilder know we are in a local scope; locals after params can be allocated starting here.
+    ExprBuilder::BeginLocalScope(m, static_cast<uint16_t>(baseLocalSlot + ps.size()));
+
+    for (size_t i = 0; i < ps.size(); i++) {
+        DeclNode *p = ps[i];
+        const std::string pname = p ? p->name : "";
+        const uint16_t slot = static_cast<uint16_t>(baseLocalSlot + i);
+
+        // Register local name -> slot (so $a loads local slot)
+        ExprBuilder::DefineLocal(m, pname, slot);
+
+        auto *L_missing = code->CodeLabel();
+        auto *L_end = code->CodeLabel();
+
+        // if (args.length < i+1) goto missing
+        *code << code->LoadReference(argsSlot);
+        *code << code->ArrayLength();
+        *code << code->PushInt(static_cast<int32_t>(i + 1));
+        *code << code->IfWithCompare(Instruction::Compare::LessThan, L_missing);
+
+        // present: slot = args[i]
+        *code << code->LoadReference(argsSlot);
+        *code << code->PushInt(static_cast<int32_t>(i));
+        *code << code->LoadReferenceFromArray();
+        *code << code->StoreReference(slot);
+        *code << code->GoTo(L_end);
+
+        // missing: slot = default or NULL
+        *code << L_missing;
+        if (p && p->expr) {
+            ExprBuilder::EmitValue(root, m, code, p->expr);
+        } else {
+            *code << code->GetStatic(nullValueField);
+        }
+        *code << code->StoreReference(slot);
+
+        *code << L_end;
+    }
+}
+
 static void emitReturnNull(Class *root, AttributeCode *code) {
     auto *nullValueField = root->getOrCreateFieldrefConstant(
         "com/phpjvm/BasePhpValue",
@@ -308,8 +378,6 @@ bool DeclNode::doSemantics() {
                 Log("skipped decl list");
             }
 
-            //!!! TODO maybe check if the function names / var / const names are the same (separately)
-            Warn("DT_CLASS implementation is unfinished");
             break;
 
         case DT_PROPERTY:
@@ -318,8 +386,9 @@ bool DeclNode::doSemantics() {
             break;
 
         case DT_PARAMETER:
-            // TODO parameter logic
-            Warn("DT_PARAMETER not implemented");
+            if (expr != nullptr) {
+                expr->doSemantics();
+            }
             break;
 
         case DT_CONSTANT:
@@ -348,8 +417,6 @@ bool DeclNode::doSemantics() {
                 Log("skipped body (no stmt)");
             }
 
-            //!!! TODO check if all paths return something and type check for the returns
-            Warn("DT_FUNCTION/DT_METHOD implementation is unfinished");
             break;
 
         default:
@@ -417,11 +484,18 @@ Class *DeclNode::processClass(Class *root, std::vector<Class *> &list) {
 
             AttributeCode *code = m->getCodeAttribute();
 
+            // args is local slot 0 in static function signature: (BasePhpValue[] args)
+            // params will be stored starting at local slot 1
+            emitBindParamsFromArgs(root, m, code, params, /*argsSlot*/0, /*baseLocalSlot*/1);
+
             if (stmt) {
                 stmt->addStmt(root, m, code);
             }
 
             emitReturnNull(root, code);
+
+            // Important: end scope so future methods don't see these locals
+            ExprBuilder::EndLocalScope(m);
             break;
         }
 
@@ -438,11 +512,19 @@ Class *DeclNode::processClass(Class *root, std::vector<Class *> &list) {
 
             AttributeCode *code = m->getCodeAttribute();
 
+            // For both class-static and instance methods, args is in local slot 1:
+            //   instance: (PhpObject self, BasePhpValue[] args)
+            //   static:   (PhpClass calledClass, BasePhpValue[] args)
+            // baseLocalSlot = 2 because slot0 + slot1 are occupied.
+            emitBindParamsFromArgs(root, m, code, params, /*argsSlot*/1, /*baseLocalSlot*/2);
+
             if (stmt) {
                 stmt->addStmt(root, m, code);
             }
 
             emitReturnNull(root, code);
+
+            ExprBuilder::EndLocalScope(m);
             break;
         }
 

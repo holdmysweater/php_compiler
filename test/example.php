@@ -1,6 +1,6 @@
 <?php
-class A {
-    public const X = 123;
+function add(int $a, int $b, bool $asString = false): int|string {
+    return $asString ? $a . $b : $a ? $b;
 }
-$a = new A();
-echo A::X + 5;
+
+echo add(2, 3) . "\n";
