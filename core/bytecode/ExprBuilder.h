@@ -32,6 +32,25 @@ public:
 
     // End local scope after compiling function/method body.
     static void EndLocalScope(jvm::Method *method);
+
+    // --- NEW: support updating nextFree without wiping the map ---
+    static void ReserveNextLocal(jvm::Method *method, uint16_t nextFreeLocal);
+
+    // --- NEW: allocate a temporary local slot (for return-value storing) ---
+    static uint16_t AllocTempLocal(jvm::Method *method);
+
+    // --- NEW: remember which locals are by-ref (valueSlot + refKeySlot) ---
+    struct ByRefPair {
+        uint16_t valueSlot;
+        uint16_t refKeySlot;
+    };
+
+    static void SetByRefLayout(jvm::Method *method, const std::vector<ByRefPair> &pairs);
+
+    static const std::vector<ByRefPair> *GetByRefLayout(jvm::Method *method);
+
+    // --- NEW: emit writeback for by-ref params (stack-neutral; call with empty stack) ---
+    static void EmitFlushByRefIfNeeded(jvm::Class *root, jvm::Method *method, jvm::AttributeCode *code);
 };
 
 #endif // PHP_COMPILER_EXPRBUILDER_H

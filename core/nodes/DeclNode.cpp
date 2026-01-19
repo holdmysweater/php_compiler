@@ -175,14 +175,14 @@ static void emitBindParamsFromArgs(
         DescriptorField("com/phpjvm/BasePhpValue")
     );
 
-    // Runtime helpers
     auto *requireGlobalRef = root->getOrCreateMethodrefConstant(
         "com/phpjvm/PhpRuntime",
         "requireGlobalRef",
         DescriptorMethod(
             DescriptorField("java/lang/String"),
             {
-                DescriptorField("com/phpjvm/BasePhpValue"), DescriptorField("java/lang/String"),
+                DescriptorField("com/phpjvm/BasePhpValue"),
+                DescriptorField("java/lang/String"),
                 DescriptorField("java/lang/String")
             }
         )
@@ -199,8 +199,13 @@ static void emitBindParamsFromArgs(
 
     std::vector<DeclNode *> ps = flattenParamList(params);
 
-    // We allocate locals for params first, then tell ExprBuilder where locals may continue.
+    // ✅ Create scope immediately so DefineLocal works
+    ExprBuilder::BeginLocalScope(m, baseLocalSlot);
+
     uint16_t nextSlot = baseLocalSlot;
+
+    std::vector<ExprBuilder::ByRefPair> byRefPairs;
+    byRefPairs.reserve(ps.size());
 
     for (size_t i = 0; i < ps.size(); i++) {
         DeclNode *p = ps[i];
@@ -210,40 +215,36 @@ static void emitBindParamsFromArgs(
         const uint16_t valueSlot = nextSlot++;
         uint16_t refDescSlot = 0;
         if (byRef) {
-            refDescSlot = nextSlot++; // String (descriptor without prefix)
+            refDescSlot = nextSlot++; // String
+            byRefPairs.push_back({valueSlot, refDescSlot});
         }
 
-        // register $param name -> local slot
+        // ✅ Now this actually registers
         ExprBuilder::DefineLocal(m, pname, valueSlot);
 
         auto *L_missing = code->CodeLabel();
         auto *L_end = code->CodeLabel();
 
-        // if (args.length < i+1) goto missing
         *code << code->LoadReference(argsSlot);
         *code << code->ArrayLength();
         *code << code->PushInt(static_cast<int32_t>(i + 1));
         *code << code->IfWithCompare(Instruction::Compare::LessThan, L_missing);
 
-        // present
         if (!byRef) {
             *code << code->LoadReference(argsSlot);
             *code << code->PushInt(static_cast<int32_t>(i));
             *code << code->LoadReferenceFromArray();
             *code << code->StoreReference(valueSlot);
         } else {
-            // ref param: require marker, store descriptor, load actual referenced value into valueSlot
-            // refDescSlot = PhpRuntime.requireGlobalRef(args[i], fnName, pname)
             *code << code->LoadReference(argsSlot);
             *code << code->PushInt(static_cast<int32_t>(i));
-            *code << code->LoadReferenceFromArray(); // BasePhpValue
+            *code << code->LoadReferenceFromArray();
 
             *code << code->PushString(fnName);
             *code << code->PushString(pname);
-            *code << code->InvokeStatic(requireGlobalRef); // String refDesc
+            *code << code->InvokeStatic(requireGlobalRef);
             *code << code->StoreReference(refDescSlot);
 
-            // valueSlot = PhpRuntime.getGlobalRefValue(refDescSlot)
             *code << code->LoadReference(refDescSlot);
             *code << code->InvokeStatic(getGlobalRefValue);
             *code << code->StoreReference(valueSlot);
@@ -251,28 +252,23 @@ static void emitBindParamsFromArgs(
 
         *code << code->GoTo(L_end);
 
-        // missing
         *code << L_missing;
         if (byRef) {
-            // no arg for by-ref: treat as NULL local and no writeback
             *code << code->GetStatic(nullValueField);
             *code << code->StoreReference(valueSlot);
             *code << code->PushNull();
             *code << code->StoreReference(refDescSlot);
         } else {
-            if (p && p->expr) {
-                ExprBuilder::EmitValue(root, m, code, p->expr);
-            } else {
-                *code << code->GetStatic(nullValueField);
-            }
+            if (p && p->expr) ExprBuilder::EmitValue(root, m, code, p->expr);
+            else *code << code->GetStatic(nullValueField);
             *code << code->StoreReference(valueSlot);
         }
 
         *code << L_end;
     }
 
-    // Now allow locals after params
-    ExprBuilder::BeginLocalScope(m, nextSlot);
+    ExprBuilder::ReserveNextLocal(m, nextSlot);
+    ExprBuilder::SetByRefLayout(m, byRefPairs);
 }
 
 // Flush by-ref params back to globals (copy-out) at function end.

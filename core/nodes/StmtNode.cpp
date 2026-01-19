@@ -6,8 +6,31 @@
 #include "jvm/attribute-code.h"
 #include "jvm/descriptor-method.h"
 #include "jvm/method.h"
+#include <unordered_map>
 
 using json = nlohmann::json;
+
+struct ReturnCtx {
+    jvm::Label *L_epilogue = nullptr;
+    uint16_t retSlot = 0;
+};
+
+static thread_local std::unordered_map<const jvm::Method *, ReturnCtx> s_returnCtx;
+
+static void setReturnCtx(const jvm::Method *m, jvm::Label *L_epilogue, uint16_t retSlot) {
+    s_returnCtx[m] = ReturnCtx{L_epilogue, retSlot};
+}
+
+static bool getReturnCtx(const jvm::Method *m, ReturnCtx &out) {
+    auto it = s_returnCtx.find(m);
+    if (it == s_returnCtx.end()) return false;
+    out = it->second;
+    return true;
+}
+
+static void clearReturnCtx(const jvm::Method *m) {
+    s_returnCtx.erase(m);
+}
 
 string StmtNode::_getClassName() const {
     return "StmtNode";
@@ -456,16 +479,15 @@ Class *StmtNode::processClass(Class *root, std::vector<Class *> &list) {
         AttributeCode *code = mainMethod->getCodeAttribute();
 
         addStmt(root, mainMethod, code, true);
+
+        *code << code->ReturnVoid();
     } catch (const std::exception &e) {
         isOk = false;
         Error(std::string("StmtNode::processClass failed: ") + e.what());
     }
 
-    if (isOk) {
-        Log("finished semantics for " + toString(type));
-    } else {
-        Error("semantics for " + toString(type) + " failed");
-    }
+    if (isOk) Log("finished semantics for " + toString(type));
+    else Error("semantics for " + toString(type) + " failed");
 
     return root;
 }
@@ -562,6 +584,21 @@ AttributeCode *StmtNode::addStmt(Class *root, Method *method, AttributeCode *cod
                 return code;
             }
 
+            ReturnCtx rctx;
+            if (getReturnCtx(method, rctx) && rctx.L_epilogue != nullptr) {
+                if (expr != nullptr) {
+                    ExprBuilder::EmitValue(root, method, code, expr);
+                } else {
+                    *code << code->GetStatic(nullValueField);
+                }
+
+                // store return value and jump
+                *code << code->StoreReference(rctx.retSlot);
+                *code << code->GoTo(rctx.L_epilogue);
+                return code;
+            }
+
+            // fallback (shouldn’t happen once you wire DeclNode correctly)
             if (expr != nullptr) {
                 ExprBuilder::EmitValue(root, method, code, expr);
             } else {

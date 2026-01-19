@@ -55,9 +55,69 @@ bool ExprBuilder::TryGetLocal(jvm::Method *method, const std::string &varName, u
     return true;
 }
 
+static std::unordered_map<const jvm::Method *, std::vector<ExprBuilder::ByRefPair> > g_byRefLayouts;
+
 void ExprBuilder::EndLocalScope(jvm::Method *method) {
     if (!method) return;
     g_localScopes.erase(method);
+    g_byRefLayouts.erase(method);
+}
+
+void ExprBuilder::ReserveNextLocal(jvm::Method *method, uint16_t nextFreeLocal) {
+    if (!method) return;
+    auto it = g_localScopes.find(method);
+    if (it == g_localScopes.end()) return;
+    if (nextFreeLocal > it->second.nextFree) it->second.nextFree = nextFreeLocal;
+}
+
+uint16_t ExprBuilder::AllocTempLocal(jvm::Method *method) {
+    if (!method) return 0;
+    auto it = g_localScopes.find(method);
+    if (it == g_localScopes.end()) return 0;
+    return it->second.nextFree++;
+}
+
+void ExprBuilder::SetByRefLayout(jvm::Method *method, const std::vector<ByRefPair> &pairs) {
+    if (!method) return;
+    g_byRefLayouts[method] = pairs;
+}
+
+const std::vector<ExprBuilder::ByRefPair> *ExprBuilder::GetByRefLayout(jvm::Method *method) {
+    if (!method) return nullptr;
+    auto it = g_byRefLayouts.find(method);
+    if (it == g_byRefLayouts.end()) return nullptr;
+    return &it->second;
+}
+
+void ExprBuilder::EmitFlushByRefIfNeeded(jvm::Class *root, jvm::Method *method, jvm::AttributeCode *code) {
+    if (!root || !method || !code) return;
+
+    const auto *pairs = GetByRefLayout(method);
+    if (!pairs || pairs->empty()) return;
+
+    auto *setGlobalRefValue = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/PhpRuntime",
+        "setGlobalRefValue",
+        DescriptorMethod(
+            std::nullopt,
+            {DescriptorField("java/lang/String"), DescriptorField("com/phpjvm/BasePhpValue")}
+        )
+    );
+
+    for (const auto &p: *pairs) {
+        auto *L_skip = code->CodeLabel();
+
+        // if (refKey == null) skip
+        *code << code->LoadReference(p.refKeySlot);
+        *code << code->IfNull(L_skip);
+
+        // PhpRuntime.setGlobalRefValue(refKey, value)
+        *code << code->LoadReference(p.refKeySlot);
+        *code << code->LoadReference(p.valueSlot);
+        *code << code->InvokeStatic(setGlobalRefValue);
+
+        *code << L_skip;
+    }
 }
 
 // Allocate a new local slot for a variable name if we are in a local scope.
