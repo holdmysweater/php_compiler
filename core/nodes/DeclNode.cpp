@@ -86,20 +86,24 @@ static DescriptorMethod descPhpStaticMethod() {
     );
 }
 
-static void emitDefaultCtor(Class *cls) {
+static void emitDefaultCtor(Class *cls, const std::string &superInternalName) {
     Method *init = cls->getOrCreateMethod("<init>", DescriptorMethod(std::nullopt, {}));
     init->addFlag(Method::ACC_PUBLIC);
 
     AttributeCode *code = init->getCodeAttribute();
 
+    const std::string superName = superInternalName.empty()
+                                      ? "java/lang/Object"
+                                      : superInternalName;
+
     auto *superInit = cls->getOrCreateMethodrefConstant(
-        "java/lang/Object",
+        superName,
         "<init>",
         DescriptorMethod(std::nullopt, {})
     );
 
-    *code << code->LoadReference(0);
-    *code << code->InvokeSpecial(superInit);
+    *code << code->LoadReference(0); // aload_0
+    *code << code->InvokeSpecial(superInit); // invokespecial super.<init>
     *code << code->ReturnVoid();
 }
 
@@ -555,23 +559,48 @@ Class *DeclNode::processClass(Class *root, std::vector<Class *> &list) {
 
         case DT_CLASS: {
             std::string clsName = toJvmInternalName(name);
-            std::string parentName = classNameExtended.empty()
-                                         ? "java/lang/Object"
-                                         : toJvmInternalName(classNameExtended);
 
-            auto *cls = new Class(clsName, parentName);
+            // JVM-level superclass for the generated .class file
+            std::string superInternal = classNameExtended.empty()
+                                            ? "java/lang/Object"
+                                            : toJvmInternalName(classNameExtended);
+
+            // PHP-runtime parent (empty = "no parent class", i.e. only Object)
+            std::string runtimeParent = classNameExtended.empty()
+                                            ? ""
+                                            : toJvmInternalName(classNameExtended);
+
+            auto *cls = new Class(clsName, superInternal);
             cls->addFlag(Class::ACC_PUBLIC);
             cls->addFlag(Class::ACC_SUPER);
 
-            emitDefaultCtor(cls);
+            // must call direct super <init>
+            emitDefaultCtor(cls, superInternal);
 
+            // Create clinit early so declList can append to it if needed.
+            Method *clinit = getOrCreateClinit(cls);
+            AttributeCode *cc = clinit->getCodeAttribute();
+
+            // PhpRuntime.defineClass(String name, String parentName) : PhpClass
+            auto *defineClass = cls->getOrCreateMethodrefConstant(
+                "com/phpjvm/PhpRuntime",
+                "defineClass",
+                DescriptorMethod(
+                    DescriptorField("com/phpjvm/PhpClass"),
+                    {DescriptorField("java/lang/String"), DescriptorField("java/lang/String")}
+                )
+            );
+
+            // Call defineClass(clsName, runtimeParent) and drop returned PhpClass
+            *cc << cc->PushString(clsName);
+            *cc << cc->PushString(runtimeParent);
+            *cc << cc->InvokeStatic(defineClass);
+            *cc << cc->PopOne();
+
+            // Generate methods/fields/etc (may also append static init logic into <clinit>)
             if (declList) declList->processClass(cls, list);
 
-            {
-                Method *clinit = getOrCreateClinit(cls);
-                AttributeCode *cc = clinit->getCodeAttribute();
-                *cc << cc->ReturnVoid();
-            }
+            *cc << cc->ReturnVoid();
 
             list.push_back(cls);
             break;
