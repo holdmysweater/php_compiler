@@ -11,6 +11,7 @@ enum ElementType {
     ELEMENT_PROGRAM_LIST,
     ELEMENT_STATEMENT,
     ELEMENT_CLASS_DECL,
+    ELEMENT_INTERFACE_DECL,
     ELEMENT_FUNC_DECL,
 };
 
@@ -21,6 +22,7 @@ inline string toString(ElementType type) {
         case ElementType::ELEMENT_PROGRAM_LIST: return "ELEMENT_PROGRAM_LIST";
         case ElementType::ELEMENT_STATEMENT: return "ELEMENT_STATEMENT";
         case ElementType::ELEMENT_CLASS_DECL: return "ELEMENT_CLASS";
+        case ElementType::ELEMENT_INTERFACE_DECL: return "ELEMENT_INTERFACE";
         case ElementType::ELEMENT_FUNC_DECL: return "ELEMENT_FUNCTION";
         default: return "ERROR";
     }
@@ -33,6 +35,7 @@ inline string toSymbol(ElementType type) {
         case ElementType::ELEMENT_PROGRAM_LIST: return "program list";
         case ElementType::ELEMENT_STATEMENT: return "statement";
         case ElementType::ELEMENT_CLASS_DECL: return "class";
+        case ElementType::ELEMENT_INTERFACE_DECL: return "interface";
         case ElementType::ELEMENT_FUNC_DECL: return "function";
         default: return "ERROR";
     }

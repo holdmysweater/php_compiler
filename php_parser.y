@@ -31,7 +31,7 @@
 
 %type <char_const> error
 %type <elementNode> program php_program_list php_program_element
-%type <declNode> function_definition class_declaration function_definition_header parameter_function_list_empty parameter_function_list parameter_function class_member_declarations_empty class_member_declarations class_member_declaration class_const_elements property_declaration method_declaration const_elements const_element property_elements property_element
+%type <declNode> function_definition interface_declaration class_declaration function_definition_header parameter_function_list_empty parameter_function_list parameter_function class_member_declarations_empty class_member_declarations class_member_declaration class_const_elements property_declaration method_declaration const_elements const_element property_elements property_element
 %type <stmtNode> statement try_statement catch_list catch_clause finally_clause while_statement for_statement statement_list_empty foreach_statement if_statement switch_statement statement_list else_statement_empty_1 elseif_statements_1 else_statement_empty_2 elseif_statements_2 elseif_statement_1 elseif_statement_2 case_statements_empty case_statements case_statement
 %type <exprNode> expression array_element array_element_list expression_list expression_list_empty string interpolatable_elements interpolatable_element simple_interpolated_expression complex_interpolated_expression expression_variable
 %type <valueNode> type_list type id_list
@@ -80,6 +80,7 @@
 %token CATCH
 %token THROW
 %token FINALLY
+%token INTERFACE
 
 %left OR
 %left AND
@@ -121,6 +122,7 @@ php_program_list : php_program_element                  { Console::ParserLog("ph
 php_program_element : statement             { Console::ParserLog("php_program_element (statement)"); $$ = ElementNode::PhpStmt($1); }
                     | function_definition   { Console::ParserLog("php_program_element (function_definition)"); $$ = ElementNode::PhpFuncDecl($1); }
                     | class_declaration     { Console::ParserLog("php_program_element (class_declaration)"); $$ = ElementNode::PhpClassDecl($1); }
+                    | interface_declaration     { Console::ParserLog("php_program_element (interface_declaration)"); $$ = ElementNode::PhpInterfaceDecl($1); }
                     ;
 
 expression : expression LOGIC_OR expression                 { Console::ParserLog("expression (expression LOGIC_OR expression)"); $$ = ExprNode::Or($1, $3); }
@@ -354,6 +356,7 @@ parameter_function : '$' ID                         { Console::ParserLog("parame
                 | type_list '&' '$' ID '=' expression   { Console::ParserLog("parameter_function (type_list '$' ID '=' expression)"); $$ = DeclNode::ParamDeclExprTypeWithAddressOp($4, $6, $1); }
                 ;
 
+interface_declaration : INTERFACE ID '{' class_member_declarations_empty '}'    { Console::ParserLog("interface_declaration (INTERFACE ID '{' class_member_declarations_empty '}')"); $$ = DeclNode::InterfaceDecl($2, $4); }
 
 class_declaration : CLASS ID '{' class_member_declarations_empty '}'            { Console::ParserLog("class_declaration (CLASS ID '{' class_member_declarations_empty '}')"); $$ = DeclNode::ClassDecl($2, $4); }
                | CLASS ID EXTENDS ID '{' class_member_declarations_empty '}'    { Console::ParserLog("class_declaration (CLASS ID EXTENDS ID '{' class_member_declarations_empty '}')"); $$ = DeclNode::ClassDecl($2, $4, $6); }

@@ -68,6 +68,7 @@ TRY         [Tt][Rr][Yy]
 CATCH       [Cc][Aa][Tt][Cc][Hh]
 THROW       [Tt][Hh][Rr][Oo][Ww]
 FINALLY     [Ff][Ii][Nn][Aa][Ll][Ll][Yy]
+INTERFACE   [Ii][Nn][Tt][Ee][Rr][Ff][Aa][Cc][Ee]
 
 %x PURE_PHP
 %x INTERPOLATED_PHP
@@ -523,6 +524,7 @@ FINALLY     [Ff][Ii][Nn][Aa][Ll][Ll][Yy]
 <PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>\${BREAK}   { logSigilAndPushId(yytext+1, "BREAK"); return '$'; }
 <PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>\${CONST}   { logSigilAndPushId(yytext+1, "CONST"); return '$'; }
 <PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>\${CLASS}   { logSigilAndPushId(yytext+1, "CLASS"); return '$'; }
+<PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>\${INTERFACE}   { logSigilAndPushId(yytext+1, "INTERFACE"); return '$'; }
 <PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>\${WHILE}   { logSigilAndPushId(yytext+1, "WHILE"); return '$'; }
 <PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>\${ELSE}   { logSigilAndPushId(yytext+1, "ELSE"); return '$'; }
 <PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>\${CASE}   { logSigilAndPushId(yytext+1, "CASE"); return '$'; }
@@ -578,6 +580,7 @@ FINALLY     [Ff][Ii][Nn][Aa][Ll][Ll][Yy]
 <PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>{BREAK}        { Console::LexLog(yylineno, yytext, "keyword BREAK"); return BREAK; }
 <PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>{CONST}        { Console::LexLog(yylineno, yytext, "keyword CONST"); return CONST; }
 <PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>{CLASS}        { Console::LexLog(yylineno, yytext, "keyword CLASS"); return CLASS; }
+<PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>{INTERFACE}    { Console::LexLog(yylineno, yytext, "keyword INTERFACE"); return INTERFACE; }
 <PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>{WHILE}        { Console::LexLog(yylineno, yytext, "keyword WHILE"); return WHILE; }
 <PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>{ELSE}         { Console::LexLog(yylineno, yytext, "keyword ELSE"); return ELSE; }
 <PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>{CASE}         { Console::LexLog(yylineno, yytext, "keyword CASE"); return CASE; }

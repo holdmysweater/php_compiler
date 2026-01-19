@@ -28,6 +28,7 @@ public:
 
     string className;
     string classNameExtended;
+    vector<string *> interfaceNameImplemented;
 
     bool hasAddressOperator = false;
     int isStatic = -1;
@@ -60,6 +61,8 @@ public:
 
     // Declarations
     static DeclNode *ClassDecl(string *className, DeclNode *declList);
+
+    static DeclNode *InterfaceDecl(string *className, DeclNode *declList);
 
     static DeclNode *ClassDecl(string *className, string *extendedClassName, DeclNode *declList);
 

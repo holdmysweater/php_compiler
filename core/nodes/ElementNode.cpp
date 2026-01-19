@@ -107,6 +107,7 @@ bool ElementNode::doSemantics() {
             break;
         case ELEMENT_STATEMENT:
         case ELEMENT_CLASS_DECL:
+        case ELEMENT_INTERFACE_DECL:
         case ELEMENT_FUNC_DECL:
             if (type == ELEMENT_STATEMENT) {
                 isOk = this->stmt->doSemantics();
@@ -224,6 +225,14 @@ ElementNode *ElementNode::AppendToElementList(ElementNode *elementList, ElementN
 ElementNode *ElementNode::PhpClassDecl(DeclNode *declList) {
     auto node = new ElementNode();
     node->type = ElementType::ELEMENT_CLASS_DECL;
+    node->decl = declList;
+    node->WriteToFiles();
+    return node;
+}
+
+ElementNode *ElementNode::PhpInterfaceDecl(DeclNode *declList) {
+    auto node = new ElementNode();
+    node->type = ElementType::ELEMENT_INTERFACE_DECL;
     node->decl = declList;
     node->WriteToFiles();
     return node;

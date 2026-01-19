@@ -33,6 +33,8 @@ public:
     // Base
     static ElementNode *PhpClassDecl(DeclNode *declList);
 
+    static ElementNode *PhpInterfaceDecl(DeclNode *declList);
+
     static ElementNode *PhpFuncDecl(DeclNode *declList);
 
     static ElementNode *PhpStmt(StmtNode *stmt);

@@ -508,6 +508,7 @@ bool DeclNode::doSemantics() {
             }
             break;
 
+        case DT_INTERFACE:
         case DT_CLASS:
             for (char &c: name) c = tolower(static_cast<unsigned char>(c));
             if (declList != nullptr) isOk = isOk && declList->doSemantics();
@@ -753,6 +754,15 @@ DeclNode *DeclNode::SetValueTypeToDecl(DeclNode *decl, ValueNode *type) {
 DeclNode *DeclNode::ClassDecl(string *className, DeclNode *declList) {
     auto node = new DeclNode();
     node->type = DT_CLASS;
+    node->name = *className;
+    node->declList = declList;
+    node->WriteToFiles();
+    return node;
+}
+
+DeclNode *DeclNode::InterfaceDecl(string *className, DeclNode *declList) {
+    auto node = new DeclNode();
+    node->type = DT_INTERFACE;
     node->name = *className;
     node->declList = declList;
     node->WriteToFiles();
