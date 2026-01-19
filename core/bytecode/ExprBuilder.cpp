@@ -43,6 +43,59 @@ static void emitUnary(
     *code << code->InvokeStatic(op); // pop1 push1
 }
 
+static std::string sanitizeJavaIdentLocal(const std::string &raw) {
+    std::string s = raw;
+    if (!s.empty() && s[0] == '$') s.erase(0, 1);
+
+    std::string out;
+    out.reserve(s.size() + 4);
+    out += "g_"; // global var prefix
+
+    for (char c: s) {
+        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_') out.push_back(c);
+        else out.push_back('_');
+    }
+
+    if (out.size() == 2) out += "var"; // "g_" only
+    if (out.size() >= 3 && (out[2] >= '0' && out[2] <= '9')) out.insert(out.begin() + 2, '_');
+    return out;
+}
+
+static ConstantFieldref *ensureGlobalVarField(Class *root, const std::string &varName) {
+    std::string fieldName = sanitizeJavaIdentLocal(varName);
+
+    Field *f = root->getOrCreateField(fieldName, DescriptorField("com/phpjvm/BasePhpValue"));
+    f->addFlag(Field::ACC_PUBLIC);
+    f->addFlag(Field::ACC_STATIC);
+
+    return root->getOrCreateFieldrefConstant(
+        root->getClassName(),
+        fieldName,
+        DescriptorField("com/phpjvm/BasePhpValue")
+    );
+}
+
+// pushes current value of $var (NULL_VALUE if field is null)
+static void emitLoadGlobalVar(
+    Class *root,
+    AttributeCode *code,
+    ConstantFieldref *fieldRef,
+    ConstantFieldref *nullValueField
+) {
+    auto *L_nonNull = code->CodeLabel();
+    auto *L_end = code->CodeLabel();
+
+    *code << code->GetStatic(fieldRef); // v
+    *code << code->Duplicate(); // v v
+    *code << code->IfNotNull(L_nonNull); // pops one v; stack: v
+    *code << code->PopOne(); // pop null
+    *code << code->GetStatic(nullValueField);
+    *code << code->GoTo(L_end);
+
+    *code << L_nonNull;
+    *code << L_end;
+}
+
 static std::string idText(const ExprNode *e) {
     if (!e) return "";
     if (!e->name.empty()) return e->name;
@@ -106,13 +159,6 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
     if (!root) throw std::logic_error("ExprBuilder::EmitValue: root is null");
     if (!method) throw std::logic_error("ExprBuilder::EmitValue: method is null");
     if (!code) throw std::logic_error("ExprBuilder::EmitValue: code is null");
-
-    if (expr->type == ExprType::ET_EXPR_LIST) {
-        for (auto child: expr->children) {
-            EmitValue(root, method, code, child);
-        }
-        return;
-    }
 
     // ---------- Runtime symbols ----------
     auto *nullValueField = root->getOrCreateFieldrefConstant(
@@ -201,6 +247,87 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
     auto *concat = root->getOrCreateMethodrefConstant(
         "com/phpjvm/BasePhpValue",
         "concat",
+        DescriptorMethod(
+            DescriptorField("com/phpjvm/BasePhpValue"),
+            {DescriptorField("com/phpjvm/BasePhpValue"), DescriptorField("com/phpjvm/BasePhpValue")}
+        )
+    );
+
+    auto *xorOp = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/BasePhpValue",
+        "xor",
+        DescriptorMethod(
+            DescriptorField("com/phpjvm/BasePhpValue"),
+            {DescriptorField("com/phpjvm/BasePhpValue"), DescriptorField("com/phpjvm/BasePhpValue")}
+        )
+    );
+
+    auto *bitAnd = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/BasePhpValue",
+        "bitAnd",
+        DescriptorMethod(
+            DescriptorField("com/phpjvm/BasePhpValue"),
+            {DescriptorField("com/phpjvm/BasePhpValue"), DescriptorField("com/phpjvm/BasePhpValue")}
+        )
+    );
+
+    auto *bitOr = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/BasePhpValue",
+        "bitOr",
+        DescriptorMethod(
+            DescriptorField("com/phpjvm/BasePhpValue"),
+            {DescriptorField("com/phpjvm/BasePhpValue"), DescriptorField("com/phpjvm/BasePhpValue")}
+        )
+    );
+
+    auto *bitXor = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/BasePhpValue",
+        "bitXor",
+        DescriptorMethod(
+            DescriptorField("com/phpjvm/BasePhpValue"),
+            {DescriptorField("com/phpjvm/BasePhpValue"), DescriptorField("com/phpjvm/BasePhpValue")}
+        )
+    );
+
+    auto *bitNot = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/BasePhpValue",
+        "bitNot",
+        DescriptorMethod(
+            DescriptorField("com/phpjvm/BasePhpValue"),
+            {DescriptorField("com/phpjvm/BasePhpValue")}
+        )
+    );
+
+    auto *shl = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/BasePhpValue",
+        "shl",
+        DescriptorMethod(
+            DescriptorField("com/phpjvm/BasePhpValue"),
+            {DescriptorField("com/phpjvm/BasePhpValue"), DescriptorField("com/phpjvm/BasePhpValue")}
+        )
+    );
+
+    auto *shr = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/BasePhpValue",
+        "shr",
+        DescriptorMethod(
+            DescriptorField("com/phpjvm/BasePhpValue"),
+            {DescriptorField("com/phpjvm/BasePhpValue"), DescriptorField("com/phpjvm/BasePhpValue")}
+        )
+    );
+
+    auto *powOp = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/BasePhpValue",
+        "pow",
+        DescriptorMethod(
+            DescriptorField("com/phpjvm/BasePhpValue"),
+            {DescriptorField("com/phpjvm/BasePhpValue"), DescriptorField("com/phpjvm/BasePhpValue")}
+        )
+    );
+
+    auto *instanceOfOp = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/BasePhpValue",
+        "instanceOf",
         DescriptorMethod(
             DescriptorField("com/phpjvm/BasePhpValue"),
             {DescriptorField("com/phpjvm/BasePhpValue"), DescriptorField("com/phpjvm/BasePhpValue")}
@@ -432,6 +559,21 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
 
     // ---------- Dispatch ----------
     switch (expr->type) {
+        case ExprType::ET_EXPR_LIST: {
+            if (expr->children.empty()) {
+                *code << code->GetStatic(nullValueField);
+                return;
+            }
+
+            for (size_t i = 0; i < expr->children.size(); i++) {
+                EmitValue(root, method, code, expr->children[i]);
+                if (i + 1 < expr->children.size()) {
+                    *code << code->PopOne(); // discard intermediate results
+                }
+            }
+            return; // last value remains
+        }
+
         // ===== literals (already working) =====
         case ExprType::ET_STRING: {
             std::string s = (expr->value ? expr->value->stringValue : "");
@@ -936,6 +1078,194 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
             return;
         }
 
+        case ExprType::ET_UPLUS: {
+            EmitValue(root, method, code, childOrNull(expr, 0));
+            return;
+        }
+
+        case ExprType::ET_UMINUS: {
+            *code << code->PushLong(0);
+            *code << code->InvokeStatic(ofLong);
+            EmitValue(root, method, code, childOrNull(expr, 0));
+            *code << code->InvokeStatic(sub); // 0 - x
+            return;
+        }
+
+        case ExprType::ET_NOT_BITWISE: {
+            emitUnary(root, method, code, childOrNull(expr, 0), bitNot, &ExprBuilder::EmitValue);
+            return;
+        }
+
+        case ExprType::ET_AND_BITWISE: {
+            emitBinary(root, method, code, childOrNull(expr, 0), childOrNull(expr, 1), bitAnd, &ExprBuilder::EmitValue);
+            return;
+        }
+        case ExprType::ET_OR_BITWISE: {
+            emitBinary(root, method, code, childOrNull(expr, 0), childOrNull(expr, 1), bitOr, &ExprBuilder::EmitValue);
+            return;
+        }
+        case ExprType::ET_XOR_BITWISE: {
+            emitBinary(root, method, code, childOrNull(expr, 0), childOrNull(expr, 1), bitXor, &ExprBuilder::EmitValue);
+            return;
+        }
+        case ExprType::ET_LEFT_SHIFT: {
+            emitBinary(root, method, code, childOrNull(expr, 0), childOrNull(expr, 1), shl, &ExprBuilder::EmitValue);
+            return;
+        }
+        case ExprType::ET_RIGHT_SHIFT: {
+            emitBinary(root, method, code, childOrNull(expr, 0), childOrNull(expr, 1), shr, &ExprBuilder::EmitValue);
+            return;
+        }
+        case ExprType::ET_POW: {
+            emitBinary(root, method, code, childOrNull(expr, 0), childOrNull(expr, 1), powOp, &ExprBuilder::EmitValue);
+            return;
+        }
+        case ExprType::ET_XOR: {
+            emitBinary(root, method, code, childOrNull(expr, 0), childOrNull(expr, 1), xorOp, &ExprBuilder::EmitValue);
+            return;
+        }
+        case ExprType::ET_INSTANCEOF: {
+            emitBinary(root, method, code, childOrNull(expr, 0), childOrNull(expr, 1), instanceOfOp,
+                       &ExprBuilder::EmitValue);
+            return;
+        }
+
+        case ExprType::ET_NOT_EQUAL_BITWISE: {
+            // PHP "<>" is the same as "!="
+            emitBinary(root, method, code, childOrNull(expr, 0), childOrNull(expr, 1), ne, &ExprBuilder::EmitValue);
+            return;
+        }
+
+        case ExprType::ET_PLUS_ASSIGN:
+        case ExprType::ET_MINUS_ASSIGN:
+        case ExprType::ET_MULT_ASSIGN:
+        case ExprType::ET_DIV_ASSIGN:
+        case ExprType::ET_MOD_ASSIGN:
+        case ExprType::ET_CONCAT_ASSIGN:
+        case ExprType::ET_LEFT_SHIFT_ASSIGN:
+        case ExprType::ET_RIGHT_SHIFT_ASSIGN:
+        case ExprType::ET_POW_ASSIGN: {
+            const ExprNode *lhs = childOrNull(expr, 0);
+            const ExprNode *rhs = childOrNull(expr, 1);
+
+            if (!lhs || lhs->type != ExprType::ET_SIGIL) {
+                Console::Warning(std::string("Compound assignment only implemented for $var: ") + toString(expr->type));
+                *code << code->GetStatic(nullValueField);
+                return;
+            }
+
+            const ExprNode *id = childOrNull(lhs, 0);
+            std::string var = idText(id);
+            auto *fieldRef = ensureGlobalVarField(root, var);
+
+            // current
+            emitLoadGlobalVar(root, code, fieldRef, nullValueField);
+
+            // rhs
+            EmitValue(root, method, code, rhs);
+
+            // op
+            ConstantMethodref *op = nullptr;
+            switch (expr->type) {
+                case ExprType::ET_PLUS_ASSIGN: op = add;
+                    break;
+                case ExprType::ET_MINUS_ASSIGN: op = sub;
+                    break;
+                case ExprType::ET_MULT_ASSIGN: op = mul;
+                    break;
+                case ExprType::ET_DIV_ASSIGN: op = div;
+                    break;
+                case ExprType::ET_MOD_ASSIGN: op = mod;
+                    break;
+                case ExprType::ET_CONCAT_ASSIGN: op = concat;
+                    break;
+                case ExprType::ET_LEFT_SHIFT_ASSIGN: op = shl;
+                    break;
+                case ExprType::ET_RIGHT_SHIFT_ASSIGN: op = shr;
+                    break;
+                case ExprType::ET_POW_ASSIGN: op = powOp;
+                    break;
+                default: break;
+            }
+
+            if (!op) {
+                Console::Warning("Compound assignment op missing (pushing NULL)");
+                *code << code->GetStatic(nullValueField);
+                return;
+            }
+
+            *code << code->InvokeStatic(op); // newValue
+            *code << code->Duplicate(); // newValue newValue
+            *code << code->PutStatic(fieldRef); // newValue
+            return;
+        }
+
+        case ExprType::ET_INCREMENT_PRE:
+        case ExprType::ET_DECREMENT_PRE:
+        case ExprType::ET_INCREMENT_POST:
+        case ExprType::ET_DECREMENT_POST: {
+            const ExprNode *lhs = childOrNull(expr, 0);
+
+            if (!lhs || lhs->type != ExprType::ET_SIGIL) {
+                Console::Warning(std::string("Inc/dec only implemented for $var: ") + toString(expr->type));
+                *code << code->GetStatic(nullValueField);
+                return;
+            }
+
+            const ExprNode *id = childOrNull(lhs, 0);
+            std::string var = idText(id);
+            auto *fieldRef = ensureGlobalVarField(root, var);
+
+            bool isInc =
+                    (expr->type == ExprType::ET_INCREMENT_PRE) ||
+                    (expr->type == ExprType::ET_INCREMENT_POST);
+
+            bool isPost =
+                    (expr->type == ExprType::ET_INCREMENT_POST) ||
+                    (expr->type == ExprType::ET_DECREMENT_POST);
+
+            if (isPost) {
+                // We must return the OLD value, but store NEW into the variable.
+                // Desired stack evolution:
+                // old
+                // old old
+                // old old one
+                // old new
+                // old new new
+                // (store) old new
+                // pop -> old
+
+                emitLoadGlobalVar(root, code, fieldRef, nullValueField); // old
+                *code << code->Duplicate(); // old old
+
+                *code << code->PushLong(1); // old old 1
+                *code << code->InvokeStatic(ofLong); // old old one
+
+                *code << code->InvokeStatic(isInc ? add : sub); // old new
+
+                *code << code->Duplicate(); // old new new
+                *code << code->PutStatic(fieldRef); // old new
+                *code << code->PopOne(); // old
+                return;
+            } else {
+                // Pre: return NEW value (and store it).
+                // old
+                // old one
+                // new
+                // new new
+                // (store) new
+
+                emitLoadGlobalVar(root, code, fieldRef, nullValueField); // old
+
+                *code << code->PushLong(1); // old 1
+                *code << code->InvokeStatic(ofLong); // old one
+
+                *code << code->InvokeStatic(isInc ? add : sub); // new
+                *code << code->Duplicate(); // new new
+                *code << code->PutStatic(fieldRef); // new
+                return;
+            }
+        }
 
         default:
             Console::Warning("ExprBuilder::EmitValue not implemented for " + toString(expr->type) + " (pushing NULL)");
