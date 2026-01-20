@@ -153,7 +153,8 @@ bool ExprNode::doSemantics() {
         }
 
         case ExprType::ET_ASSIGN:
-            if (children[0]->type != ExprType::ET_SIGIL && children[0]->type != ExprType::ET_ARRAY_INDEX) {
+            if (children[0]->type != ExprType::ET_SIGIL && children[0]->type != ExprType::ET_ARRAY_INDEX && children[0]
+                ->type != ExprType::ET_PROPERTY_ACCESS) {
                 Error("(ET_ASSIGN) left child isn't a SIGIL or ARRAY_INDEX (" + children[0]->toJson() + ")");
                 isOk = false;
                 break;
