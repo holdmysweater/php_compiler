@@ -22,6 +22,24 @@ struct LocalScopeInfo {
 
 static std::unordered_map<const jvm::Method *, LocalScopeInfo> g_localScopes;
 
+static std::unordered_map<const jvm::Method *, bool> g_phpHasThis;
+
+void ExprBuilder::SetPhpMethodHasThis(jvm::Method *method, bool hasThis) {
+    if (!method) return;
+    g_phpHasThis[method] = hasThis;
+}
+
+bool ExprBuilder::PhpMethodHasThis(jvm::Method *method) {
+    if (!method) return false;
+    auto it = g_phpHasThis.find(method);
+    if (it == g_phpHasThis.end()) return false;
+    return it->second;
+}
+
+uint16_t ExprBuilder::PhpThisLocalSlot() {
+    return 0;
+}
+
 static std::string normalizeVarName(std::string s) {
     if (!s.empty() && s[0] == '$') s.erase(s.begin());
     return s;
@@ -824,6 +842,48 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
         )
     );
 
+    auto *rtRequireClass = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/PhpRuntime",
+        "requireClass",
+        DescriptorMethod(
+            DescriptorField("com/phpjvm/PhpClass"),
+            {DescriptorField("java/lang/String")}
+        )
+    );
+
+    auto *objGetPhpClass = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/PhpObject",
+        "getPhpClass",
+        DescriptorMethod(DescriptorField("com/phpjvm/PhpClass"), {})
+    );
+
+    auto *rtCallParent = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/PhpRuntime",
+        "callParent",
+        DescriptorMethod(
+            DescriptorField("com/phpjvm/BasePhpValue"),
+            {
+                DescriptorField("com/phpjvm/PhpObject"),
+                DescriptorField("java/lang/String"),
+                DescriptorField("java/lang/String"),
+                DescriptorField("com/phpjvm/BasePhpValue", 1)
+            }
+        )
+    );
+
+    auto *rtCallParentStatic = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/PhpRuntime",
+        "callParentStatic",
+        DescriptorMethod(
+            DescriptorField("com/phpjvm/BasePhpValue"),
+            {
+                DescriptorField("java/lang/String"),
+                DescriptorField("java/lang/String"),
+                DescriptorField("com/phpjvm/BasePhpValue", 1)
+            }
+        )
+    );
+
     if (expr == nullptr) {
         *code << code->GetStatic(nullValueField);
         return;
@@ -999,6 +1059,28 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
         case ExprType::ET_SIGIL: {
             const ExprNode *id = childOrNull(expr, 0);
             std::string var = idText(id);
+
+            // Special: $this inside instance methods
+            if (lowerCopy(var) == "this") {
+                if (ExprBuilder::PhpMethodHasThis(method)) {
+                    auto *ofObject = root->getOrCreateMethodrefConstant(
+                        "com/phpjvm/BasePhpValue",
+                        "object",
+                        DescriptorMethod(
+                            DescriptorField("com/phpjvm/BasePhpValue"),
+                            {DescriptorField("com/phpjvm/PhpObject")}
+                        )
+                    );
+
+                    *code << code->LoadReference(ExprBuilder::PhpThisLocalSlot()); // PhpObject
+                    *code << code->InvokeStatic(ofObject); // BasePhpValue
+                    return;
+                }
+
+                Console::Warning("$this used in static context (pushing NULL)");
+                *code << code->GetStatic(nullValueField);
+                return;
+            }
 
             uint16_t localIndex = 0;
 
@@ -1234,7 +1316,82 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
                 return;
             }
 
-            // ET_FUNCTION_CALL(ET_NEW(...), args) -> newObject
+            // ---------------------------------------------------------------------
+            // NEW: static access used as a call: X::m(...)
+            // AST shape: ET_FUNCTION_CALL( ET_STATIC_PROPERTY_ACCESS(X, m), args )
+            // where X can be: parent/self/static/ClassName
+            // ---------------------------------------------------------------------
+            if (fn->type == ExprType::ET_STATIC_PROPERTY_ACCESS) {
+                const ExprNode *classExpr = childOrNull(fn, 0);
+                const ExprNode *memberExpr = childOrNull(fn, 1);
+
+                std::string classToken = lowerCopy(idText(classExpr));
+                std::string memberName = idText(memberExpr);
+                std::string memberLower = lowerCopy(memberName);
+
+                if (memberLower.empty()) {
+                    Console::Warning("ET_FUNCTION_CALL(ET_STATIC_PROPERTY_ACCESS): missing member name (pushing NULL)");
+                    *code << code->GetStatic(nullValueField);
+                    return;
+                }
+
+                // parent::m(...)
+                if (classToken == "parent") {
+                    if (ExprBuilder::PhpMethodHasThis(method)) {
+                        // instance context => implicit $this (PhpObject in local 0)
+                        *code << code->LoadReference(ExprBuilder::PhpThisLocalSlot()); // PhpObject
+                        *code << code->PushString(root->getClassName()); // lexical class
+                        *code << code->PushString(memberLower);
+                        emitArgsArray(root, method, code, argsNode);
+                        *code << code->InvokeStatic(rtCallParent);
+                        return;
+                    }
+
+                    // static context => parent static
+                    *code << code->PushString(root->getClassName()); // lexical class
+                    *code << code->PushString(memberLower);
+                    emitArgsArray(root, method, code, argsNode);
+                    *code << code->InvokeStatic(rtCallParentStatic);
+                    return;
+                }
+
+                // self::m(...) => lexical class (the class where the method is defined)
+                if (classToken == "self") {
+                    *code << code->PushString(root->getClassName());
+                    *code << code->InvokeStatic(rtRequireClass); // PhpClass
+                    *code << code->PushString(memberLower);
+                    emitArgsArray(root, method, code, argsNode);
+                    *code << code->InvokeStatic(rtCallStatic);
+                    return;
+                }
+
+                // static::m(...) => late static binding (called class)
+                if (classToken == "static") {
+                    if (ExprBuilder::PhpMethodHasThis(method)) {
+                        // instance method: called class is $this->getPhpClass()
+                        *code << code->LoadReference(ExprBuilder::PhpThisLocalSlot()); // PhpObject
+                        *code << code->InvokeVirtual(objGetPhpClass); // PhpClass
+                    } else {
+                        // static method: called class is the PhpClass param in local 0
+                        *code << code->LoadReference(0); // PhpClass
+                    }
+
+                    *code << code->PushString(memberLower);
+                    emitArgsArray(root, method, code, argsNode);
+                    *code << code->InvokeStatic(rtCallStatic);
+                    return;
+                }
+
+                // Explicit class name: Foo::m(...)
+                *code << code->PushString(classToken);
+                *code << code->InvokeStatic(rtRequireClass); // PhpClass
+                *code << code->PushString(memberLower);
+                emitArgsArray(root, method, code, argsNode);
+                *code << code->InvokeStatic(rtCallStatic);
+                return;
+            }
+
+            // Existing behavior: ET_FUNCTION_CALL(ET_NEW(...), args) -> newObject
             if (fn->type == ExprType::ET_NEW) {
                 const ExprNode *classNameExpr = childOrNull(fn, 0);
                 std::string className = idText(classNameExpr);
@@ -1276,10 +1433,6 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
                 )
             );
 
-            // If we have a signature, we can:
-            // - emit by-ref markers for $var args
-            // - check provided arg types
-            // - check return type after call
             const PhpFuncSig *sig = findFunctionSig(fnName);
 
             auto *basePhpValueClass = root->getOrCreateClassConstant("com/phpjvm/BasePhpValue");
@@ -1309,31 +1462,26 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
                 const ExprNode *ai = args[i];
 
                 if (wantByRef) {
-                    // Only allow $var (ET_SIGIL) at call sites. Emit a marker instead of the value.
                     if (ai && ai->type == ExprType::ET_SIGIL) {
                         const ExprNode *id = childOrNull(ai, 0);
                         std::string var = idText(id);
                         std::string fieldName = sanitizeJavaIdent(var);
 
-                        // host class for globals is the current program class (dot name)
                         std::string hostDot = root->getClassName();
                         for (char &c: hostDot) if (c == '/') c = '.';
 
                         *code << code->PushString(hostDot);
                         *code << code->PushString(fieldName);
-                        *code << code->InvokeStatic(rtMakeGlobalRef); // BasePhpValue (marker string)
+                        *code << code->InvokeStatic(rtMakeGlobalRef);
                     } else {
-                        // pass normal value; callee will throw when it sees it's not a marker
                         EmitValue(root, method, code, ai);
                     }
                 } else {
                     EmitValue(root, method, code, ai);
 
-                    // call-site param type check (only for provided args)
                     if (sig && i < sig->params.size() && !wantTypes.empty()) {
-                        emitStringArrayConst(root, code, wantTypes); // String[] allowed
+                        emitStringArrayConst(root, code, wantTypes);
                         *code << code->PushString(fnName);
-                        // paramName not available here, pass "argN"
                         *code << code->PushString(std::string("arg") + std::to_string(i + 1));
                         *code << code->InvokeStatic(rtAssertParamType);
                     }
@@ -1342,9 +1490,8 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
                 *code << code->StoreReferenceToArray();
             }
 
-            *code << code->InvokeStatic(callFn); // BasePhpValue
+            *code << code->InvokeStatic(callFn);
 
-            // call-site return type check
             if (sig && !sig->returnTypes.empty()) {
                 emitStringArrayConst(root, code, sig->returnTypes);
                 *code << code->PushString(fnName);

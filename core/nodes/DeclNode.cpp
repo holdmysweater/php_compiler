@@ -613,6 +613,7 @@ Class *DeclNode::processClass(Class *root, std::vector<Class *> &list) {
             ExprBuilder::RegisterFunctionSignature(fn, params, valueType);
 
             Method *m = root->getOrCreateMethod(fn, descPhpFunction());
+            ExprBuilder::SetPhpMethodHasThis(m, false);
             m->addFlag(Method::ACC_PUBLIC);
             m->addFlag(Method::ACC_STATIC);
 
@@ -668,6 +669,7 @@ Class *DeclNode::processClass(Class *root, std::vector<Class *> &list) {
             DescriptorMethod sig = phpStatic ? descPhpStaticMethod() : descPhpInstanceMethod();
 
             Method *m = root->getOrCreateMethod(mn, sig);
+            ExprBuilder::SetPhpMethodHasThis(m, !phpStatic);
             applyVisibility(m, visibilityType);
             m->addFlag(Method::ACC_STATIC);
 
