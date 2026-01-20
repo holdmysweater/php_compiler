@@ -137,6 +137,31 @@ Class *ElementNode::processClass(Class *root, std::vector<Class *> &list) {
     switch (type) {
         case ElementType::ELEMENT_EMPTY:
         case ElementType::ELEMENT_PROGRAM_LIST: {
+            // 0) Ensure the program/root class registers itself in PhpRuntime.CLASSES
+            //    so requireClass("example") works.
+            Method *clinit = root->getOrCreateMethod(
+                "<clinit>",
+                DescriptorMethod(std::nullopt, {}) // void <clinit>()
+            );
+            clinit->addFlag(Method::ACC_STATIC);
+
+            AttributeCode *cc = clinit->getCodeAttribute();
+
+            auto *defineClass = root->getOrCreateMethodrefConstant(
+                "com/phpjvm/PhpRuntime",
+                "defineClass",
+                DescriptorMethod(
+                    DescriptorField("com/phpjvm/PhpClass"),
+                    {DescriptorField("java/lang/String"), DescriptorField("java/lang/String")}
+                )
+            );
+
+            // PhpRuntime.defineClass(rootName, "")
+            *cc << cc->PushString(root->getClassName()); // e.g. "example"
+            *cc << cc->PushString(""); // no parent
+            *cc << cc->InvokeStatic(defineClass);
+            *cc << cc->PopOne();
+
             // 1) create main ONCE
             Method *mainMethod = root->getOrCreateMethod(
                 "main",
@@ -170,8 +195,12 @@ Class *ElementNode::processClass(Class *root, std::vector<Class *> &list) {
                 }
             }
 
-            // 3) return once at the end
+            // 3) return once at the end of main
             *code << code->ReturnVoid();
+
+            // 4) return once at the end of <clinit> (IMPORTANT: after children had a chance to append to it)
+            *cc << cc->ReturnVoid();
+
             break;
         }
 

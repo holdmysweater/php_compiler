@@ -90,7 +90,7 @@ static DescriptorMethod descPhpFunction() {
         DescriptorField("com/phpjvm/BasePhpValue"),
         {
             DescriptorField("com/phpjvm/PhpClass"),
-            DescriptorField("[Lcom/phpjvm/BasePhpValue;")
+            DescriptorField("com/phpjvm/BasePhpValue", 1)
         }
     );
 }

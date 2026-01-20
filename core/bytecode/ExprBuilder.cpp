@@ -1008,6 +1008,27 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
         )
     );
 
+    // Add MethodRef constants for the native PHP functions
+    auto *rtCount = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/BasePhpValue",
+        "count",
+        DescriptorMethod(DescriptorField("com/phpjvm/BasePhpValue"), {DescriptorField("com/phpjvm/BasePhpValue")})
+    );
+
+    auto *rtImplode = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/BasePhpValue",
+        "implode", DescriptorMethod(DescriptorField("com/phpjvm/BasePhpValue"), {
+                                        DescriptorField("com/phpjvm/BasePhpValue"),
+                                        DescriptorField("com/phpjvm/BasePhpValue")
+                                    })
+    );
+
+    auto *rtTrim = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/BasePhpValue",
+        "trim",
+        DescriptorMethod(DescriptorField("com/phpjvm/BasePhpValue"), {DescriptorField("com/phpjvm/BasePhpValue")})
+    );
+
     if (expr == nullptr) {
         *code << code->GetStatic(nullValueField);
         return;
@@ -1622,19 +1643,6 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
                 return;
             }
 
-            // ---- user-defined global functions: static on program class ----
-            auto *callFn = root->getOrCreateMethodrefConstant(
-                root->getClassName(),
-                fnName,
-                DescriptorMethod(
-                    DescriptorField("com/phpjvm/BasePhpValue"),
-                    {DescriptorField("com/phpjvm/BasePhpValue", 1)}
-                )
-            );
-
-            const PhpFuncSig *sig = findFunctionSig(fnName);
-
-            auto *basePhpValueClass = root->getOrCreateClassConstant("com/phpjvm/BasePhpValue");
             std::vector<const ExprNode *> args;
             if (argsNode) {
                 if (argsNode->type == ExprType::ET_EXPR_LIST) {
@@ -1643,6 +1651,90 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
                     args.push_back(argsNode);
                 }
             }
+
+            // ---- BasePhpValue-native builtins ----
+            if (fnName == "count") {
+                // evaluate arg0 (or NULL)
+                if (!args.empty()) EmitValue(root, method, code, args[0]);
+                else *code << code->GetStatic(nullValueField);
+
+                // evaluate extra args for side-effects, then drop them
+                for (size_t i = 1; i < args.size(); i++) {
+                    EmitValue(root, method, code, args[i]);
+                    *code << code->PopOne();
+                }
+
+                *code << code->InvokeStatic(rtCount);
+                return;
+            }
+
+            if (fnName == "trim") {
+                if (!args.empty()) EmitValue(root, method, code, args[0]);
+                else *code << code->GetStatic(nullValueField);
+
+                for (size_t i = 1; i < args.size(); i++) {
+                    EmitValue(root, method, code, args[i]);
+                    *code << code->PopOne();
+                }
+
+                *code << code->InvokeStatic(rtTrim);
+                return;
+            }
+
+            // PHP: implode($glue, $pieces) OR implode($pieces) OR join(...)
+            if (fnName == "implode" || fnName == "join") {
+                if (args.size() == 0) {
+                    // glue="" , pieces=NULL
+                    *code << code->PushString("");
+                    *code << code->InvokeStatic(ofString);
+                    *code << code->GetStatic(nullValueField);
+                    *code << code->InvokeStatic(rtImplode);
+                    return;
+                }
+
+                if (args.size() == 1) {
+                    // glue="" , pieces=args[0]
+                    *code << code->PushString("");
+                    *code << code->InvokeStatic(ofString);
+                    EmitValue(root, method, code, args[0]);
+                    *code << code->InvokeStatic(rtImplode);
+                    return;
+                }
+
+                // glue=args[0], pieces=args[1]
+                EmitValue(root, method, code, args[0]);
+                EmitValue(root, method, code, args[1]);
+
+                // evaluate extras for side effects, then drop
+                for (size_t i = 2; i < args.size(); i++) {
+                    EmitValue(root, method, code, args[i]);
+                    *code << code->PopOne();
+                }
+
+                *code << code->InvokeStatic(rtImplode);
+                return;
+            }
+
+            // ---- user-defined global functions: static on program class ----
+            auto *callFn = root->getOrCreateMethodrefConstant(
+                root->getClassName(),
+                fnName,
+                DescriptorMethod(
+                    DescriptorField("com/phpjvm/BasePhpValue"),
+                    {
+                        DescriptorField("com/phpjvm/PhpClass"),
+                        DescriptorField("com/phpjvm/BasePhpValue", 1)
+                    }
+                )
+            );
+
+            const PhpFuncSig *sig = findFunctionSig(fnName);
+
+            auto *basePhpValueClass = root->getOrCreateClassConstant("com/phpjvm/BasePhpValue");
+
+            // push PhpClass (first argument of every generated PHP function)
+            *code << code->PushString(root->getClassName());
+            *code << code->InvokeStatic(rtRequireClass); // -> PhpClass
 
             *code << code->PushInt((int32_t) args.size());
             *code << code->NewArray(basePhpValueClass);
