@@ -1029,6 +1029,24 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
         DescriptorMethod(DescriptorField("com/phpjvm/BasePhpValue"), {DescriptorField("com/phpjvm/BasePhpValue")})
     );
 
+    auto *rtPrintR1 = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/BasePhpValue",
+        "print_r",
+        DescriptorMethod(
+            DescriptorField("com/phpjvm/BasePhpValue"),
+            {DescriptorField("com/phpjvm/BasePhpValue")}
+        )
+    );
+
+    auto *rtPrintR2 = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/BasePhpValue",
+        "print_r",
+        DescriptorMethod(
+            DescriptorField("com/phpjvm/BasePhpValue"),
+            {DescriptorField("com/phpjvm/BasePhpValue"), DescriptorField("com/phpjvm/BasePhpValue")}
+        )
+    );
+
     if (expr == nullptr) {
         *code << code->GetStatic(nullValueField);
         return;
@@ -1406,17 +1424,14 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
         }
 
         case ExprType::ET_ARRAY_ELEMENT_LIST: {
-            const ExprNode *elements = childOrNull(expr, 0);
-
             *code << code->InvokeStatic(arrFactory);
-
             std::vector<const ExprNode *> parts;
-            if (elements) {
-                if (elements->type == ExprType::ET_EXPR_LIST) {
-                    for (auto *ch: elements->children) if (ch) parts.push_back(ch);
-                } else {
-                    parts.push_back(elements);
-                }
+
+            if (expr->children.size() == 1 && expr->children[0] &&
+                expr->children[0]->type == ExprType::ET_EXPR_LIST) {
+                for (auto *ch: expr->children[0]->children) if (ch) parts.push_back(ch);
+            } else {
+                for (auto *ch: expr->children) if (ch) parts.push_back(ch);
             }
 
             for (auto *p: parts) {
@@ -1712,6 +1727,39 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
                 }
 
                 *code << code->InvokeStatic(rtImplode);
+                return;
+            }
+
+            if (fnName == "print_r") {
+                // print_r() -> print_r(NULL)
+                if (args.size() == 0) {
+                    *code << code->GetStatic(nullValueField);
+                    *code << code->InvokeStatic(rtPrintR1);
+                    return;
+                }
+
+                // arg0
+                EmitValue(root, method, code, args[0]);
+
+                if (args.size() >= 2) {
+                    EmitValue(root, method, code, args[1]);
+                    *code << code->InvokeStatic(rtPrintR2);
+                    // evaluate extras for side-effects, then drop
+                    for (size_t i = 2; i < args.size(); i++) {
+                        EmitValue(root, method, code, args[i]);
+                        *code << code->PopOne();
+                    }
+                    return;
+                }
+
+                // one-arg form
+                *code << code->InvokeStatic(rtPrintR1);
+
+                // extras (none here, but keep pattern consistent)
+                for (size_t i = 1; i < args.size(); i++) {
+                    EmitValue(root, method, code, args[i]);
+                    *code << code->PopOne();
+                }
                 return;
             }
 
