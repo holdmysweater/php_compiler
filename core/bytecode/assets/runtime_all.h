@@ -18,6 +18,7 @@
 #include "PhpObject_class.h"
 #include "PhpRef_class.h"
 #include "PhpRuntime$ConstLookup_class.h"
+#include "PhpRuntime$PhpThrown_class.h"
 #include "PhpRuntime$PropLookup_class.h"
 #include "PhpRuntime$StaticFieldRef_class.h"
 #include "PhpRuntime_class.h"

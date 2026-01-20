@@ -47,6 +47,7 @@ static const EmbeddedClassFile kPhpRuntimeFiles[] = {
     {"com/phpjvm/PhpRuntime.class", PhpRuntime_class, PhpRuntime_class_len},
     {"com/phpjvm/PhpRuntime$ConstLookup.class", PhpRuntime_ConstLookup_class, PhpRuntime_ConstLookup_class_len},
     {"com/phpjvm/PhpRuntime$PropLookup.class", PhpRuntime_PropLookup_class, PhpRuntime_PropLookup_class_len},
+    {"com/phpjvm/PhpRuntime$PhpThrown.class", PhpRuntime_PhpThrown_class, PhpRuntime_PhpThrown_class_len},
     {"com/phpjvm/PhpStaticMethod.class", PhpStaticMethod_class, PhpStaticMethod_class_len},
     {"com/phpjvm/PhpRef.class", PhpRef_class, PhpRef_class_len},
     {

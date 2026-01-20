@@ -245,7 +245,7 @@ static void emitBindParamsFromArgs(
         uint16_t refDescSlot = 0;
         if (byRef) {
             refDescSlot = nextSlot++; // String
-            byRefPairs.push_back({valueSlot, refDescSlot});
+            byRefPairs.push_back({refDescSlot, valueSlot});
         }
 
         // ✅ Now this actually registers
@@ -655,7 +655,7 @@ Class *DeclNode::processClass(Class *root, std::vector<Class *> &list) {
 
             AttributeCode *code = m->getCodeAttribute();
 
-            emitBindParamsFromArgs(root, m, code, params, fn, /*argsSlot*/0, /*baseLocalSlot*/1);
+            emitBindParamsFromArgs(root, m, code, params, fn, /*argsSlot*/1, /*baseLocalSlot*/2);
 
             uint16_t retSlot = ExprBuilder::AllocTempLocal(m);
             auto *L_epilogue = code->CodeLabel();

@@ -449,6 +449,9 @@ bool StmtNode::doSemantics() {
             }
             break;
 
+        case ST_FINALLY:
+        case ST_CATCH:
+        case ST_THROW:
         case ST_CASE:
         case ST_CASE_DEFAULT:
         case ST_ECHO:
@@ -461,7 +464,7 @@ bool StmtNode::doSemantics() {
             break;
 
         default:
-            Error("unknown enum type");
+            Error("unknown enum type: " + toString(type));
             return false;
     }
 
@@ -939,16 +942,248 @@ AttributeCode *StmtNode::addStmt(Class *root, Method *method, AttributeCode *cod
             return code;
         }
 
+        case ST_THROW: {
+            auto *toThrowable = root->getOrCreateMethodrefConstant(
+                "com/phpjvm/PhpRuntime",
+                "toThrowable",
+                DescriptorMethod(
+                    DescriptorField("java/lang/Throwable"),
+                    {DescriptorField("com/phpjvm/BasePhpValue")}
+                )
+            );
+
+            if (expr != nullptr) {
+                ExprBuilder::EmitValue(root, method, code, expr); // BasePhpValue
+            } else {
+                *code << code->GetStatic(nullValueField); // BasePhpValue NULL_VALUE
+            }
+
+            *code << code->InvokeStatic(toThrowable); // Throwable
+            *code << code->Throw(); // athrow
+            return code;
+        }
+
+        case ST_TRY: {
+            auto *thrClass = root->getOrCreateClassConstant("java/lang/Throwable");
+
+            auto *unwrapThrowable = root->getOrCreateMethodrefConstant(
+                "com/phpjvm/PhpRuntime",
+                "unwrapThrowable",
+                DescriptorMethod(
+                    DescriptorField("com/phpjvm/BasePhpValue"),
+                    {DescriptorField("java/lang/Throwable")}
+                )
+            );
+
+            auto *isInstanceOf = root->getOrCreateMethodrefConstant(
+                "com/phpjvm/PhpRuntime",
+                "isInstanceOf",
+                DescriptorMethod(
+                    DescriptorField("Z"),
+                    {DescriptorField("com/phpjvm/BasePhpValue"), DescriptorField("java/lang/String")}
+                )
+            );
+
+            auto collectTypeNames = [](ValueNode *vt) -> std::vector<std::string> {
+                std::vector<std::string> out;
+                if (!vt) return out;
+                try {
+                    for (auto *el: vt->valueList) {
+                        if (!el) continue;
+                        if (!el->name.empty()) out.push_back(el->name);
+                    }
+                } catch (...) {
+                }
+                return out;
+            };
+
+            auto storeToVarNameFromStack = [&](const std::string &varName) {
+                std::string var = varName;
+                if (!var.empty() && var[0] == '$') var.erase(var.begin());
+
+                if (var.empty()) {
+                    *code << code->PopOne();
+                    return;
+                }
+
+                uint16_t slot = 0;
+                if (ExprBuilder::TryGetLocal(method, var, slot)) {
+                    *code << code->StoreReference(slot);
+                    return;
+                }
+
+                uint16_t newSlot = ExprBuilder::AllocTempLocal(method);
+                if (newSlot != 0) {
+                    ExprBuilder::DefineLocal(method, var, newSlot);
+                    *code << code->StoreReference(newSlot);
+                    return;
+                }
+
+                auto *fieldRef = ensureGlobalVarField(var);
+                *code << code->PutStatic(fieldRef);
+            };
+
+            bool hasFinally = (finallyStmt != nullptr);
+            bool hasCatch = (catchStmt != nullptr);
+
+            uint16_t thrSlot = allocTempAny(method); // Throwable
+            uint16_t exValSlot = allocTempAny(method); // BasePhpValue (unwrapped)
+
+            auto *L_tryStart = code->CodeLabel();
+            auto *L_tryEnd = code->CodeLabel();
+            auto *L_handler = code->CodeLabel();
+            auto *L_after = code->CodeLabel();
+
+            jvm::Label *L_finallyEntry = nullptr;
+            jvm::Label *L_handlerFromCatchBody = nullptr;
+
+            if (hasFinally) {
+                L_finallyEntry = code->CodeLabel();
+                L_handlerFromCatchBody = code->CodeLabel();
+
+                // thrSlot = null (so finally knows "normal exit")
+                *code << code->PushNull();
+                *code << code->StoreReference(thrSlot);
+            }
+
+            // --- try block ---
+            *code << L_tryStart;
+            if (stmt) code = stmt->addStmt(root, method, code, isMain);
+            *code << L_tryEnd;
+
+            *code << code->GoTo(hasFinally ? L_finallyEntry : L_after);
+
+            // --- handler for exceptions thrown in try ---
+            *code << L_handler;
+            *code << code->StoreReference(thrSlot); // store Throwable caught by JVM
+
+            if (hasCatch) {
+                // exValSlot = PhpRuntime.unwrapThrowable(thr)
+                *code << code->LoadReference(thrSlot);
+                *code << code->InvokeStatic(unwrapThrowable);
+                *code << code->StoreReference(exValSlot);
+
+                // normalize catch list
+                std::vector<StmtNode *> catches;
+                if (catchStmt->type == ST_STMT_LIST) {
+                    for (auto *c: catchStmt->children) if (c && c->type == ST_CATCH) catches.push_back(c);
+                } else if (catchStmt->type == ST_CATCH) {
+                    catches.push_back(catchStmt);
+                }
+
+                for (auto *c: catches) {
+                    auto *L_nextCatch = code->CodeLabel();
+                    auto *L_matched = code->CodeLabel();
+
+                    auto typeNames = collectTypeNames(c->catchType);
+                    if (typeNames.empty()) {
+                        // catch () { } is invalid in PHP; treat as non-match
+                        *code << code->GoTo(L_nextCatch);
+                    } else {
+                        // if any type matches => L_matched
+                        for (size_t i = 0; i < typeNames.size(); i++) {
+                            auto *L_nextType = (i + 1 < typeNames.size()) ? code->CodeLabel() : nullptr;
+
+                            *code << code->LoadReference(exValSlot);
+                            *code << code->PushString(typeNames[i]);
+                            *code << code->InvokeStatic(isInstanceOf); // Z
+                            if (L_nextType) {
+                                *code << code->If(jvm::Instruction::Compare::Equal, L_nextType); // 0 => next type
+                                *code << code->GoTo(L_matched); // 1 => matched
+                                *code << L_nextType;
+                            } else {
+                                *code << code->If(jvm::Instruction::Compare::Equal, L_nextCatch);
+                                // last: 0 => next catch
+                                *code << code->GoTo(L_matched); // 1 => matched
+                            }
+                        }
+                    }
+
+                    *code << L_matched;
+
+                    // $e = exValSlot
+                    if (!c->catchId.empty()) {
+                        *code << code->LoadReference(exValSlot);
+                        storeToVarNameFromStack(c->catchId);
+                    }
+
+                    // catch body (protect it for finally if present)
+                    jvm::Label *L_catchBodyStart = nullptr;
+                    jvm::Label *L_catchBodyEnd = nullptr;
+                    if (hasFinally) {
+                        L_catchBodyStart = code->CodeLabel();
+                        L_catchBodyEnd = code->CodeLabel();
+                        *code << L_catchBodyStart;
+                    }
+
+                    if (c->stmt) code = c->stmt->addStmt(root, method, code, isMain);
+
+                    if (hasFinally) {
+                        *code << L_catchBodyEnd;
+                        // if catch body throws, we still want finally
+                        code->addCatchAll(L_catchBodyStart, L_catchBodyEnd, L_handlerFromCatchBody);
+
+                        // normal handled catch: thrSlot = null; goto finally
+                        *code << code->PushNull();
+                        *code << code->StoreReference(thrSlot);
+                        *code << code->GoTo(L_finallyEntry);
+                    } else {
+                        *code << code->GoTo(L_after);
+                    }
+
+                    *code << L_nextCatch;
+                }
+            }
+
+            // no catch matched (or no catches): rethrow
+            if (hasFinally) {
+                // thrSlot already holds the thrown throwable
+                *code << code->GoTo(L_finallyEntry); // finally will rethrow (thrSlot != null)
+            } else {
+                *code << code->LoadReference(thrSlot);
+                *code << code->Throw();
+            }
+
+            // --- handler for exceptions thrown inside catch bodies (finally only) ---
+            if (hasFinally) {
+                *code << L_handlerFromCatchBody;
+                *code << code->StoreReference(thrSlot); // Throwable
+                *code << code->GoTo(L_finallyEntry);
+
+                // finally:
+                *code << L_finallyEntry;
+                if (finallyStmt->stmt) code = finallyStmt->stmt->addStmt(root, method, code, isMain);
+
+                auto *L_noThrow = code->CodeLabel();
+                *code << code->LoadReference(thrSlot);
+                *code << code->IfNull(L_noThrow); // if null => normal continue
+                *code << code->LoadReference(thrSlot);
+                *code << code->Throw(); // rethrow
+                *code << L_noThrow;
+
+                *code << L_after;
+            } else {
+                *code << L_after;
+            }
+
+            // exception table: protect try region
+            code->addTryCatch(L_tryStart, L_tryEnd, L_handler, thrClass);
+
+            return code;
+        }
+
+        case ST_CATCH:
+        case ST_FINALLY: {
+            if (stmt) code = stmt->addStmt(root, method, code, isMain);
+            return code;
+        }
+
         // ============================================================
         // Not needed right now (or rewritten in semantics)
         // ============================================================
         case ST_SWITCH:
         case ST_CASE:
         case ST_CASE_DEFAULT:
-        case ST_THROW:
-        case ST_CATCH:
-        case ST_FINALLY:
-        case ST_TRY:
         case ST_ELSE_IF:
         case ST_ELSE:
         default:
