@@ -8,6 +8,8 @@
 #include "jvm/method.h"
 #include <unordered_map>
 
+#include "jvm/field.h"
+
 using json = nlohmann::json;
 
 struct ReturnCtx {
@@ -30,6 +32,19 @@ static bool getReturnCtx(const jvm::Method *m, ReturnCtx &out) {
 
 static void clearReturnCtx(const jvm::Method *m) {
     s_returnCtx.erase(m);
+}
+
+static thread_local std::unordered_map<const jvm::Method *, uint16_t> s_tempNextFree;
+
+// Allocate a temp local even in main() (which has no ExprBuilder local-scope).
+static uint16_t allocTempAny(jvm::Method *method) {
+    uint16_t s = ExprBuilder::AllocTempLocal(method);
+    if (s != 0) return s; // normal function/method scope
+
+    // Fallback for main() (slot 0 is String[] args)
+    uint16_t &next = s_tempNextFree[method];
+    if (next == 0) next = 1;
+    return next++;
 }
 
 string StmtNode::_getClassName() const {
@@ -554,6 +569,92 @@ AttributeCode *StmtNode::addStmt(Class *root, Method *method, AttributeCode *cod
     auto currentContinue = [&]() -> jvm::Label * {
         return s_continueStack.empty() ? nullptr : s_continueStack.back();
     };
+    auto childOrNull = [](const ExprNode *e, size_t i) -> const ExprNode * {
+        if (!e) return nullptr;
+        if (i >= e->children.size()) return nullptr;
+        return e->children[i];
+    };
+
+    auto idText = [](const ExprNode *e) -> std::string {
+        if (!e) return "";
+        if (!e->name.empty()) return e->name;
+        if (e->value) {
+            if (!e->value->name.empty()) return e->value->name;
+            if (e->value->stringValue.data()) return std::string(e->value->stringValue);
+        }
+        return "";
+    };
+
+    auto normalizeVar = [](std::string s) -> std::string {
+        if (!s.empty() && s[0] == '$') s.erase(s.begin());
+        return s;
+    };
+
+    auto sanitizeJavaIdent = [](const std::string &raw) -> std::string {
+        std::string s = raw;
+        if (!s.empty() && s[0] == '$') s.erase(0, 1);
+
+        std::string out;
+        out.reserve(s.size() + 4);
+        out += "g_";
+
+        for (char c: s) {
+            if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+                (c >= '0' && c <= '9') || c == '_')
+                out.push_back(c);
+            else out.push_back('_');
+        }
+
+        if (out.size() == 2) out += "var";
+        if (out.size() >= 3 && (out[2] >= '0' && out[2] <= '9')) out.insert(out.begin() + 2, '_');
+        return out;
+    };
+
+    auto ensureGlobalVarField = [&](const std::string &varName) -> jvm::ConstantFieldref * {
+        std::string fieldName = sanitizeJavaIdent(varName);
+
+        jvm::Field *f = root->getOrCreateField(fieldName, jvm::DescriptorField("com/phpjvm/BasePhpValue"));
+        f->addFlag(jvm::Field::ACC_PUBLIC);
+        f->addFlag(jvm::Field::ACC_STATIC);
+
+        return root->getOrCreateFieldrefConstant(
+            root->getClassName(),
+            fieldName,
+            jvm::DescriptorField("com/phpjvm/BasePhpValue")
+        );
+    };
+
+    // Consumes a BasePhpValue from stack and stores it into the foreach var
+    auto storeToPhpVar = [&](ExprNode *varExpr) {
+        // accept ET_ID or ET_SIGIL(ET_ID)
+        const ExprNode *v = varExpr;
+        if (v && v->type == ExprType::ET_SIGIL) v = childOrNull(v, 0);
+
+        std::string var = normalizeVar(idText(v));
+        if (var.empty()) {
+            Warn("ST_FOREACH: missing foreach variable (dropping value)");
+            *code << code->PopOne();
+            return;
+        }
+
+        uint16_t slot = 0;
+        if (ExprBuilder::TryGetLocal(method, var, slot)) {
+            *code << code->StoreReference(slot);
+            return;
+        }
+
+        // If we are in a real local scope, allocate a slot and register it
+        uint16_t newSlot = ExprBuilder::AllocTempLocal(method);
+        if (newSlot != 0) {
+            ExprBuilder::DefineLocal(method, var, newSlot);
+            *code << code->StoreReference(newSlot);
+            return;
+        }
+
+        // Otherwise: program scope => global static field
+        auto *fieldRef = ensureGlobalVarField(var);
+        *code << code->PutStatic(fieldRef);
+    };
 
     // ------------------------------------------------------------
     // Dispatch
@@ -767,13 +868,83 @@ AttributeCode *StmtNode::addStmt(Class *root, Method *method, AttributeCode *cod
             return code;
         }
 
+        case ST_FOREACH: {
+            // Runtime refs
+            auto *foreachIter = root->getOrCreateMethodrefConstant(
+                "com/phpjvm/BasePhpValue",
+                "foreachIter",
+                jvm::DescriptorMethod(
+                    jvm::DescriptorField("com/phpjvm/BasePhpValue$ForeachIter"),
+                    {jvm::DescriptorField("com/phpjvm/BasePhpValue")}
+                )
+            );
+
+            auto *iterAdvance = root->getOrCreateMethodrefConstant(
+                "com/phpjvm/BasePhpValue$ForeachIter",
+                "advance",
+                DescriptorMethod(DescriptorField("Z"), {})
+            );
+
+            auto *iterValue = root->getOrCreateMethodrefConstant(
+                "com/phpjvm/BasePhpValue$ForeachIter",
+                "value",
+                DescriptorMethod(DescriptorField("com/phpjvm/BasePhpValue"), {})
+            );
+
+            auto *iterKey = root->getOrCreateMethodrefConstant(
+                "com/phpjvm/BasePhpValue$ForeachIter",
+                "key",
+                DescriptorMethod(DescriptorField("com/phpjvm/BasePhpValue"), {})
+            );
+
+            // Build iterator: it = BasePhpValue.foreachIter(collection)
+            ExprBuilder::EmitValue(root, method, code, foreachCollection); // BasePhpValue
+            *code << code->InvokeStatic(foreachIter); // ForeachIter
+
+            uint16_t itSlot = allocTempAny(method);
+            *code << code->StoreReference(itSlot);
+
+            auto *L_advance = code->CodeLabel(); // continue target
+            auto *L_break = code->CodeLabel();
+
+            pushLoop(L_break, L_advance);
+
+            *code << L_advance;
+
+            // if (!it.advance()) break;
+            *code << code->LoadReference(itSlot);
+            *code << code->InvokeVirtual(iterAdvance); // Z
+            *code << code->If(jvm::Instruction::Compare::Equal, L_break);
+
+            // $value = it.value();
+            *code << code->LoadReference(itSlot);
+            *code << code->InvokeVirtual(iterValue); // BasePhpValue
+            storeToPhpVar(foreachValue);
+
+            // optional: $key = it.key();
+            if (foreachKey != nullptr) {
+                *code << code->LoadReference(itSlot);
+                *code << code->InvokeVirtual(iterKey); // BasePhpValue
+                storeToPhpVar(foreachKey);
+            }
+
+            // body
+            if (stmt) code = stmt->addStmt(root, method, code, isMain);
+
+            // loop
+            *code << code->GoTo(L_advance);
+
+            *code << L_break;
+            popLoop();
+            return code;
+        }
+
         // ============================================================
         // Not needed right now (or rewritten in semantics)
         // ============================================================
         case ST_SWITCH:
         case ST_CASE:
         case ST_CASE_DEFAULT:
-        case ST_FOREACH:
         case ST_THROW:
         case ST_CATCH:
         case ST_FINALLY:

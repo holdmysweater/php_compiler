@@ -15,6 +15,11 @@ struct EmbeddedClassFile {
 static const EmbeddedClassFile kPhpRuntimeFiles[] = {
     {"com/phpjvm/BasePhpValue.class", BasePhpValue_class, BasePhpValue_class_len},
     {"com/phpjvm/BasePhpValue$PhpArray.class", BasePhpValue_PhpArray_class, BasePhpValue_PhpArray_class_len},
+    {
+        "com/phpjvm/BasePhpValue$ForeachIter.class",
+        BasePhpValue_ForeachIter_class,
+        BasePhpValue_ForeachIter_class_len
+    },
     {"com/phpjvm/BasePhpValue$PhpKey$K.class", BasePhpValue_PhpKey_K_class, BasePhpValue_PhpKey_K_class_len},
     {"com/phpjvm/BasePhpValue$PhpKey.class", BasePhpValue_PhpKey_class, BasePhpValue_PhpKey_class_len},
     {"com/phpjvm/BasePhpValue$PhpNumber.class", BasePhpValue_PhpNumber_class, BasePhpValue_PhpNumber_class_len},

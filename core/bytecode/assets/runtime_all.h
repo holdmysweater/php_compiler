@@ -1,6 +1,7 @@
 #pragma once
 // Auto-generated: includes all embedded runtime class blobs (*.class)
 
+#include "BasePhpValue$ForeachIter_class.h"
 #include "BasePhpValue$PhpArray_class.h"
 #include "BasePhpValue$PhpKey$K_class.h"
 #include "BasePhpValue$PhpKey_class.h"
