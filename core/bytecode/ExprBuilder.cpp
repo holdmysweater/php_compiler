@@ -1563,6 +1563,33 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
                 return;
             }
 
+            // ---------------------------------------------------------------------
+            // NEW: instance method access used as a call: $obj->m(...)
+            // AST shape: ET_FUNCTION_CALL( ET_METHOD_ACCESS(obj, m), args )
+            // ---------------------------------------------------------------------
+            if (fn->type == ExprType::ET_METHOD_ACCESS) {
+                const ExprNode *objExpr = childOrNull(fn, 0);
+                const ExprNode *nameExpr = childOrNull(fn, 1);
+
+                std::string methodName = lowerCopy(idText(nameExpr));
+                if (methodName.empty()) {
+                    Console::Warning("ET_FUNCTION_CALL(ET_METHOD_ACCESS): missing method name (pushing NULL)");
+                    *code << code->GetStatic(nullValueField);
+                    return;
+                }
+
+                // Evaluate object -> PhpObject
+                EmitValue(root, method, code, objExpr); // BasePhpValue
+                *code << code->InvokeVirtual(asObject); // PhpObject
+
+                // callMethodCtx(obj, "method", args, callerCtx)
+                *code << code->PushString(methodName);
+                emitArgsArray(root, method, code, argsNode);
+                *code << code->PushString(ExprBuilder::PhpCallerClass(method));
+                *code << code->InvokeStatic(rtCallMethodCtx);
+                return;
+            }
+
             // Existing behavior: ET_FUNCTION_CALL(ET_NEW(...), args) -> newObject
             if (fn->type == ExprType::ET_NEW) {
                 const ExprNode *classNameExpr = childOrNull(fn, 0);
@@ -1670,6 +1697,32 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
                 *code << code->InvokeStatic(rtAssertReturnType);
             }
 
+            return;
+        }
+
+        case ExprType::ET_METHOD_ACCESS: {
+            const ExprNode *objExpr = childOrNull(expr, 0);
+            const ExprNode *nameExpr = childOrNull(expr, 1);
+
+            std::string methodName = lowerCopy(idText(nameExpr));
+            if (methodName.empty()) {
+                Console::Warning("ET_METHOD_ACCESS: missing method name (pushing NULL)");
+                *code << code->GetStatic(nullValueField);
+                return;
+            }
+
+            auto *basePhpValueClass = root->getOrCreateClassConstant("com/phpjvm/BasePhpValue");
+
+            // object -> PhpObject
+            EmitValue(root, method, code, objExpr); // BasePhpValue
+            *code << code->InvokeVirtual(asObject); // PhpObject
+
+            // callMethodCtx(obj, "method", [], callerCtx)
+            *code << code->PushString(methodName);
+            *code << code->PushInt(0);
+            *code << code->NewArray(basePhpValueClass); // BasePhpValue[0]
+            *code << code->PushString(ExprBuilder::PhpCallerClass(method));
+            *code << code->InvokeStatic(rtCallMethodCtx);
             return;
         }
 

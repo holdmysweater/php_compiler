@@ -17,9 +17,31 @@
 using json = nlohmann::json;
 using namespace jvm;
 
+#include <unordered_map>
+
 static std::string toLowerAscii(std::string s) {
     for (char &c: s) c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
     return s;
+}
+
+static std::unordered_map<jvm::Class *, bool> g_classHasMagicCtor;
+
+static bool declTreeHasMethodNamed(DeclNode *n, const std::string &wantLower) {
+    if (!n) return false;
+
+    if (n->type == DT_METHOD) {
+        return toLowerAscii(n->name) == wantLower;
+    }
+
+    // Some nodes store nested decl lists
+    if (n->declList) {
+        if (declTreeHasMethodNamed(n->declList, wantLower)) return true;
+    }
+
+    for (auto *ch: n->children) {
+        if (declTreeHasMethodNamed(ch, wantLower)) return true;
+    }
+    return false;
 }
 
 // Add near the top of DeclNode.cpp (helpers)
@@ -609,6 +631,8 @@ Class *DeclNode::processClass(Class *root, std::vector<Class *> &list) {
             *cc << cc->InvokeStatic(defineClass);
             *cc << cc->PopOne();
 
+            g_classHasMagicCtor[cls] = declTreeHasMethodNamed(declList, "__construct");
+
             // Generate methods/fields/etc (may also append static init logic into <clinit>)
             if (declList) declList->processClass(cls, list);
 
@@ -669,12 +693,30 @@ Class *DeclNode::processClass(Class *root, std::vector<Class *> &list) {
             std::string mn = toLowerAscii(name);
 
             std::string owner = toLowerAscii(root->getClassName());
-            ExprBuilder::RegisterMethodSignature(owner, mn, params, valueType);
-
             const bool phpStatic = (isStatic == 1);
+
+            bool hasMagicCtor = false;
+            auto itCtor = g_classHasMagicCtor.find(root);
+            if (itCtor != g_classHasMagicCtor.end()) hasMagicCtor = itCtor->second;
+
+            // Old-style constructor: function ClassName() { ... }
+            bool emitOldCtorAlias = false;
+            std::string emittedName = mn;
+
+            if (!phpStatic && mn == owner && !hasMagicCtor) {
+                emittedName = "__construct";
+                emitOldCtorAlias = true;
+            }
+
+            // register signature under the emitted name (and alias too if we emit it)
+            ExprBuilder::RegisterMethodSignature(owner, emittedName, params, valueType);
+            if (emitOldCtorAlias) {
+                ExprBuilder::RegisterMethodSignature(owner, mn, params, valueType);
+            }
+
             DescriptorMethod sig = phpStatic ? descPhpStaticMethod() : descPhpInstanceMethod();
 
-            Method *m = root->getOrCreateMethod(mn, sig);
+            Method *m = root->getOrCreateMethod(emittedName, sig);
             ExprBuilder::SetPhpMethodHasThis(m, !phpStatic);
             ExprBuilder::SetPhpCallerClass(m, owner);
             applyVisibility(m, visibilityType);
@@ -682,7 +724,8 @@ Class *DeclNode::processClass(Class *root, std::vector<Class *> &list) {
 
             AttributeCode *code = m->getCodeAttribute();
 
-            emitBindParamsFromArgs(root, m, code, params, owner + "::" + mn, /*argsSlot*/1, /*baseLocalSlot*/2);
+            emitBindParamsFromArgs(root, m, code, params, owner + "::" + emittedName, /*argsSlot*/1, /*baseLocalSlot*/
+                                   2);
 
             uint16_t retSlot = ExprBuilder::AllocTempLocal(m);
             auto *L_epilogue = code->CodeLabel();
@@ -713,6 +756,26 @@ Class *DeclNode::processClass(Class *root, std::vector<Class *> &list) {
             *code << code->ReturnReference();
 
             ExprBuilder::EndLocalScope(m);
+
+            // If we treated ClassName() as __construct, emit alias ClassName() -> __construct()
+            if (emitOldCtorAlias) {
+                Method *alias = root->getOrCreateMethod(mn, sig);
+                applyVisibility(alias, visibilityType);
+                alias->addFlag(Method::ACC_STATIC);
+
+                AttributeCode *ac = alias->getCodeAttribute();
+                auto *target = root->getOrCreateMethodrefConstant(
+                    root->getClassName(),
+                    "__construct",
+                    sig
+                );
+
+                *ac << ac->LoadReference(0); // PhpObject self
+                *ac << ac->LoadReference(1); // BasePhpValue[] args
+                *ac << ac->InvokeStatic(target);
+                *ac << ac->ReturnReference();
+            }
+
             break;
         }
 
