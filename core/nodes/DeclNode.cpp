@@ -540,7 +540,7 @@ bool DeclNode::doSemantics() {
             break;
 
         case DT_PROPERTY:
-            Warn("DT_PROPERTY not implemented");
+            if (expr != nullptr) expr->doSemantics();
             break;
 
         case DT_PARAMETER:
@@ -882,7 +882,6 @@ Class *DeclNode::processClass(Class *root, std::vector<Class *> &list) {
         }
 
         case DT_PARAMETER:
-            Warn("DeclNode::processClass: " + toString(type) + " not implemented yet");
             break;
 
         default:

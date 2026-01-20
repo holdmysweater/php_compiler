@@ -1108,21 +1108,19 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
         }
 
         case ExprType::ET_COMPLEX_STRING: {
-            if (expr->children.empty() || expr->children[0] == nullptr) {
-                *code << code->PushString("");
-                *code << code->InvokeStatic(ofString);
-                return;
-            }
-
-            const ExprNode *args = expr->children[0];
-
+            // AST variants:
+            //  A) children = [ ET_EXPR_LIST(parts...) ]
+            //  B) children = [ part0, part1, part2, ... ]
             std::vector<const ExprNode *> parts;
-            if (args->type == ExprType::ET_EXPR_LIST) {
-                for (auto *p: args->children) {
+
+            if (expr->children.size() == 1 &&
+                expr->children[0] &&
+                expr->children[0]->type == ExprType::ET_EXPR_LIST) {
+                for (auto *p: expr->children[0]->children)
                     if (p) parts.push_back(p);
-                }
             } else {
-                parts.push_back(args);
+                for (auto *p: expr->children)
+                    if (p) parts.push_back(p);
             }
 
             if (parts.empty()) {
@@ -1361,6 +1359,30 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
             const ExprNode *objExpr = childOrNull(expr, 0);
             const ExprNode *nameExpr = childOrNull(expr, 1);
 
+            // Some ASTs represent method calls like $obj->foo() as:
+            //   ET_PROPERTY_ACCESS(objExpr, ET_FUNCTION_CALL(ET_ID foo, args?))
+            // Treat that as a method invocation.
+            if (nameExpr && nameExpr->type == ExprType::ET_FUNCTION_CALL) {
+                const ExprNode *mNameExpr = childOrNull(nameExpr, 0);
+                const ExprNode *mArgsNode = childOrNull(nameExpr, 1);
+
+                std::string methodName = lowerCopy(idText(mNameExpr));
+                if (methodName.empty()) {
+                    Console::Warning("ET_PROPERTY_ACCESS: missing method name (pushing NULL)");
+                    *code << code->GetStatic(nullValueField);
+                    return;
+                }
+
+                EmitValue(root, method, code, objExpr); // BasePhpValue
+                *code << code->InvokeVirtual(asObject); // PhpObject
+                *code << code->PushString(methodName);
+                emitArgsArray(root, method, code, mArgsNode);
+                *code << code->PushString(ExprBuilder::PhpCallerClass(method));
+                *code << code->InvokeStatic(rtCallMethodCtx);
+                return;
+            }
+
+            // Normal property read: $obj->prop
             std::string propName = idText(nameExpr);
             if (propName.empty()) {
                 Console::Warning("ET_PROPERTY_ACCESS: missing property name (pushing NULL)");
@@ -1370,9 +1392,9 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
 
             EmitValue(root, method, code, objExpr);
             *code << code->InvokeVirtual(asObject); // PhpObject
-            *code << code->PushString(propName); // name
-            *code << code->PushString(ExprBuilder::PhpCallerClass(method)); // caller ctx
-            *code << code->InvokeStatic(rtGetPropCtx); // BasePhpValue
+            *code << code->PushString(propName);
+            *code << code->PushString(ExprBuilder::PhpCallerClass(method));
+            *code << code->InvokeStatic(rtGetPropCtx);
             return;
         }
 
