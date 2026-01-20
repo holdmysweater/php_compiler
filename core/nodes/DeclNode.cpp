@@ -63,10 +63,13 @@ static std::string toJvmInternalName(std::string s) {
 }
 
 static DescriptorMethod descPhpFunction() {
-    // BasePhpValue f(BasePhpValue[] args)
+    // (Lcom/phpjvm/PhpClass;[Lcom/phpjvm/BasePhpValue;)Lcom/phpjvm/BasePhpValue;
     return DescriptorMethod(
         DescriptorField("com/phpjvm/BasePhpValue"),
-        {DescriptorField("com/phpjvm/BasePhpValue", 1)}
+        {
+            DescriptorField("com/phpjvm/PhpClass"),
+            DescriptorField("[Lcom/phpjvm/BasePhpValue;")
+        }
     );
 }
 

@@ -1532,6 +1532,7 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
                     *code << code->InvokeStatic(rtRequireClass); // PhpClass
                     *code << code->PushString(memberLower);
                     emitArgsArray(root, method, code, argsNode);
+                    *code << code->PushString(ExprBuilder::PhpCallerClass(method));
                     *code << code->InvokeStatic(rtCallStaticCtx);
                     return;
                 }
@@ -1539,16 +1540,15 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
                 // static::m(...) => late static binding (called class)
                 if (classToken == "static") {
                     if (ExprBuilder::PhpMethodHasThis(method)) {
-                        // instance method: called class is $this->getPhpClass()
                         *code << code->LoadReference(ExprBuilder::PhpThisLocalSlot()); // PhpObject
                         *code << code->InvokeVirtual(objGetPhpClass); // PhpClass
                     } else {
-                        // static method: called class is the PhpClass param in local 0
                         *code << code->LoadReference(0); // PhpClass
                     }
 
                     *code << code->PushString(memberLower);
                     emitArgsArray(root, method, code, argsNode);
+                    *code << code->PushString(ExprBuilder::PhpCallerClass(method));
                     *code << code->InvokeStatic(rtCallStaticCtx);
                     return;
                 }
@@ -1558,6 +1558,7 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
                 *code << code->InvokeStatic(rtRequireClass); // PhpClass
                 *code << code->PushString(memberLower);
                 emitArgsArray(root, method, code, argsNode);
+                *code << code->PushString(ExprBuilder::PhpCallerClass(method));
                 *code << code->InvokeStatic(rtCallStaticCtx);
                 return;
             }
