@@ -48,10 +48,16 @@ public:
     // Main expression emitter
     static void EmitValue(jvm::Class *root, jvm::Method *method, jvm::AttributeCode *code, const ExprNode *expr);
 
-    // NEW: method context helpers (needed for $this + static::)
+    // Method context helpers (needed for $this + static::)
     static void SetPhpMethodHasThis(jvm::Method *method, bool hasThis);
 
     static bool PhpMethodHasThis(jvm::Method *method);
 
     static uint16_t PhpThisLocalSlot(); // currently always 0 in your calling convention
+
+    // NEW: caller-scope (lexical class) for PHP visibility checks
+    // Empty string = global scope / function scope (no class context)
+    static void SetPhpCallerClass(jvm::Method *method, const std::string &callerClassLower);
+
+    static std::string PhpCallerClass(jvm::Method *method);
 };

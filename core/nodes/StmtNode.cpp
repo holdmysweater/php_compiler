@@ -468,13 +468,16 @@ Class *StmtNode::processClass(Class *root, std::vector<Class *> &list) {
         Method *mainMethod = root->getOrCreateMethod(
             "main",
             DescriptorMethod(
-                std::nullopt, // void
-                {DescriptorField("java/lang/String", 1)} // String[] args
+                std::nullopt,
+                {DescriptorField("java/lang/String", 1)}
             )
         );
 
         mainMethod->addFlag(Method::ACC_PUBLIC);
         mainMethod->addFlag(Method::ACC_STATIC);
+
+        ExprBuilder::SetPhpMethodHasThis(mainMethod, false);
+        ExprBuilder::SetPhpCallerClass(mainMethod, "");
 
         AttributeCode *code = mainMethod->getCodeAttribute();
 

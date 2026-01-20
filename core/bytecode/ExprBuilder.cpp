@@ -74,11 +74,14 @@ bool ExprBuilder::TryGetLocal(jvm::Method *method, const std::string &varName, u
 }
 
 static std::unordered_map<const jvm::Method *, std::vector<ExprBuilder::ByRefPair> > g_byRefLayouts;
+static std::unordered_map<const jvm::Method *, std::string> g_phpCallerClass;
 
 void ExprBuilder::EndLocalScope(jvm::Method *method) {
     if (!method) return;
     g_localScopes.erase(method);
     g_byRefLayouts.erase(method);
+    g_phpHasThis.erase(method);
+    g_phpCallerClass.erase(method);
 }
 
 void ExprBuilder::ReserveNextLocal(jvm::Method *method, uint16_t nextFreeLocal) {
@@ -419,6 +422,18 @@ static void emitStringArrayConst(Class *root, AttributeCode *code, const std::ve
     }
 }
 
+void ExprBuilder::SetPhpCallerClass(jvm::Method *method, const std::string &callerClassLower) {
+    if (!method) return;
+    g_phpCallerClass[method] = callerClassLower;
+}
+
+std::string ExprBuilder::PhpCallerClass(jvm::Method *method) {
+    if (!method) return "";
+    auto it = g_phpCallerClass.find(method);
+    if (it == g_phpCallerClass.end()) return "";
+    return it->second;
+}
+
 void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, const ExprNode *expr) {
     if (!root) throw std::logic_error("ExprBuilder::EmitValue: root is null");
     if (!method) throw std::logic_error("ExprBuilder::EmitValue: method is null");
@@ -713,28 +728,30 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
         DescriptorMethod(DescriptorField("com/phpjvm/PhpObject"), {})
     );
 
-    auto *rtCallMethod = root->getOrCreateMethodrefConstant(
+    auto *rtCallMethodCtx = root->getOrCreateMethodrefConstant(
         "com/phpjvm/PhpRuntime",
-        "callMethod",
+        "callMethodCtx",
         DescriptorMethod(
             DescriptorField("com/phpjvm/BasePhpValue"),
             {
                 DescriptorField("com/phpjvm/PhpObject"),
                 DescriptorField("java/lang/String"),
-                DescriptorField("com/phpjvm/BasePhpValue", 1)
+                DescriptorField("com/phpjvm/BasePhpValue", 1),
+                DescriptorField("java/lang/String")
             }
         )
     );
 
-    auto *rtCallStatic = root->getOrCreateMethodrefConstant(
+    auto *rtCallStaticCtx = root->getOrCreateMethodrefConstant(
         "com/phpjvm/PhpRuntime",
-        "callStatic",
+        "callStaticCtx",
         DescriptorMethod(
             DescriptorField("com/phpjvm/BasePhpValue"),
             {
                 DescriptorField("com/phpjvm/PhpClass"),
                 DescriptorField("java/lang/String"),
-                DescriptorField("com/phpjvm/BasePhpValue", 1)
+                DescriptorField("com/phpjvm/BasePhpValue", 1),
+                DescriptorField("java/lang/String")
             }
         )
     );
@@ -1138,13 +1155,19 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
                 return;
             }
 
+            // obj -> PhpObject
             EmitValue(root, method, code, objExpr);
             *code << code->InvokeVirtual(asObject);
 
+            // method name + args
             *code << code->PushString(methodName);
             emitArgsArray(root, method, code, argsNode);
 
-            *code << code->InvokeStatic(rtCallMethod);
+            // NEW: caller scope for PHP visibility checks
+            *code << code->PushString(ExprBuilder::PhpCallerClass(method));
+
+            // call
+            *code << code->InvokeStatic(rtCallMethodCtx);
             return;
         }
 
@@ -1361,7 +1384,7 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
                     *code << code->InvokeStatic(rtRequireClass); // PhpClass
                     *code << code->PushString(memberLower);
                     emitArgsArray(root, method, code, argsNode);
-                    *code << code->InvokeStatic(rtCallStatic);
+                    *code << code->InvokeStatic(rtCallStaticCtx);
                     return;
                 }
 
@@ -1378,7 +1401,7 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
 
                     *code << code->PushString(memberLower);
                     emitArgsArray(root, method, code, argsNode);
-                    *code << code->InvokeStatic(rtCallStatic);
+                    *code << code->InvokeStatic(rtCallStaticCtx);
                     return;
                 }
 
@@ -1387,7 +1410,7 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
                 *code << code->InvokeStatic(rtRequireClass); // PhpClass
                 *code << code->PushString(memberLower);
                 emitArgsArray(root, method, code, argsNode);
-                *code << code->InvokeStatic(rtCallStatic);
+                *code << code->InvokeStatic(rtCallStaticCtx);
                 return;
             }
 

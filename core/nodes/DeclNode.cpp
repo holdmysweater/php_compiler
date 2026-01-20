@@ -614,6 +614,7 @@ Class *DeclNode::processClass(Class *root, std::vector<Class *> &list) {
 
             Method *m = root->getOrCreateMethod(fn, descPhpFunction());
             ExprBuilder::SetPhpMethodHasThis(m, false);
+            ExprBuilder::SetPhpCallerClass(m, "");
             m->addFlag(Method::ACC_PUBLIC);
             m->addFlag(Method::ACC_STATIC);
 
@@ -670,6 +671,7 @@ Class *DeclNode::processClass(Class *root, std::vector<Class *> &list) {
 
             Method *m = root->getOrCreateMethod(mn, sig);
             ExprBuilder::SetPhpMethodHasThis(m, !phpStatic);
+            ExprBuilder::SetPhpCallerClass(m, owner);
             applyVisibility(m, visibilityType);
             m->addFlag(Method::ACC_STATIC);
 
