@@ -901,6 +901,113 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
         )
     );
 
+    auto *rtGetStaticPropCtx = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/PhpRuntime",
+        "getStaticPropCtx",
+        DescriptorMethod(
+            DescriptorField("com/phpjvm/BasePhpValue"),
+            {
+                DescriptorField("com/phpjvm/PhpClass"),
+                DescriptorField("java/lang/String"),
+                DescriptorField("java/lang/String")
+            }
+        )
+    );
+
+    auto *rtSetStaticPropCtx = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/PhpRuntime",
+        "setStaticPropCtx",
+        DescriptorMethod(
+            DescriptorField("com/phpjvm/BasePhpValue"),
+            {
+                DescriptorField("com/phpjvm/PhpClass"),
+                DescriptorField("java/lang/String"),
+                DescriptorField("com/phpjvm/BasePhpValue"),
+                DescriptorField("java/lang/String")
+            }
+        )
+    );
+
+    auto *rtGetConstCtx = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/PhpRuntime",
+        "getConstCtx",
+        DescriptorMethod(
+            DescriptorField("com/phpjvm/BasePhpValue"),
+            {
+                DescriptorField("com/phpjvm/PhpClass"),
+                DescriptorField("java/lang/String"),
+                DescriptorField("java/lang/String")
+            }
+        )
+    );
+
+    auto *rtGetParentStaticPropCtx = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/PhpRuntime",
+        "getParentStaticPropCtx",
+        DescriptorMethod(
+            DescriptorField("com/phpjvm/BasePhpValue"),
+            {
+                DescriptorField("java/lang/String"),
+                DescriptorField("java/lang/String"),
+                DescriptorField("java/lang/String")
+            }
+        )
+    );
+
+    auto *rtSetParentStaticPropCtx = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/PhpRuntime",
+        "setParentStaticPropCtx",
+        DescriptorMethod(
+            DescriptorField("com/phpjvm/BasePhpValue"),
+            {
+                DescriptorField("java/lang/String"),
+                DescriptorField("java/lang/String"),
+                DescriptorField("com/phpjvm/BasePhpValue"),
+                DescriptorField("java/lang/String")
+            }
+        )
+    );
+
+    auto *rtGetParentConstCtx = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/PhpRuntime",
+        "getParentConstCtx",
+        DescriptorMethod(
+            DescriptorField("com/phpjvm/BasePhpValue"),
+            {
+                DescriptorField("java/lang/String"),
+                DescriptorField("java/lang/String"),
+                DescriptorField("java/lang/String")
+            }
+        )
+    );
+
+    auto *rtGetPropCtx = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/PhpRuntime",
+        "getPropCtx",
+        DescriptorMethod(
+            DescriptorField("com/phpjvm/BasePhpValue"),
+            {
+                DescriptorField("com/phpjvm/PhpObject"),
+                DescriptorField("java/lang/String"),
+                DescriptorField("java/lang/String")
+            }
+        )
+    );
+
+    auto *rtSetPropCtx = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/PhpRuntime",
+        "setPropCtx",
+        DescriptorMethod(
+            DescriptorField("com/phpjvm/BasePhpValue"),
+            {
+                DescriptorField("com/phpjvm/PhpObject"),
+                DescriptorField("java/lang/String"),
+                DescriptorField("com/phpjvm/BasePhpValue"),
+                DescriptorField("java/lang/String")
+            }
+        )
+    );
+
     if (expr == nullptr) {
         *code << code->GetStatic(nullValueField);
         return;
@@ -1116,13 +1223,13 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
             const ExprNode *lhs = childOrNull(expr, 0);
             const ExprNode *rhs = childOrNull(expr, 1);
 
+            // ---- $var = expr ----
             if (lhs && lhs->type == ExprType::ET_SIGIL) {
                 const ExprNode *id = childOrNull(lhs, 0);
                 std::string var = idText(id);
 
                 uint16_t localIndex = 0;
 
-                // If in local scope => assign local (alloc if first assignment)
                 if (allocLocalIfInScope(method, var, localIndex)) {
                     EmitValue(root, method, code, rhs);
                     *code << code->Duplicate();
@@ -1130,7 +1237,6 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
                     return;
                 }
 
-                // Otherwise assign global
                 auto *fieldRef = ensureGlobalVarField(root, var);
                 EmitValue(root, method, code, rhs);
                 *code << code->Duplicate();
@@ -1138,36 +1244,77 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
                 return;
             }
 
-            Console::Warning("ET_ASSIGN bytecode: only $var = expr implemented (pushing NULL)");
-            *code << code->GetStatic(nullValueField);
-            return;
-        }
+            // ---- A::$prop = expr  (only if member is ET_SIGIL) ----
+            if (lhs && lhs->type == ExprType::ET_STATIC_PROPERTY_ACCESS) {
+                const ExprNode *classExpr = childOrNull(lhs, 0);
+                const ExprNode *memberExpr = childOrNull(lhs, 1);
 
-        case ExprType::ET_METHOD_ACCESS: {
-            const ExprNode *objExpr = childOrNull(expr, 0);
-            const ExprNode *nameExpr = childOrNull(expr, 1);
-            const ExprNode *argsNode = childOrNull(expr, 2);
+                std::string classToken = lowerCopy(idText(classExpr));
+                bool isStaticProp = (memberExpr && memberExpr->type == ExprType::ET_SIGIL);
+                std::string memberName = isStaticProp ? idText(childOrNull(memberExpr, 0)) : idText(memberExpr);
 
-            std::string methodName = idText(nameExpr);
-            if (methodName.empty()) {
-                Console::Warning("ET_METHOD_ACCESS: missing method name (pushing NULL)");
-                *code << code->GetStatic(nullValueField);
+                if (!isStaticProp) {
+                    Console::Warning("ET_ASSIGN: cannot assign to class constant (pushing NULL)");
+                    *code << code->GetStatic(nullValueField);
+                    return;
+                }
+
+                std::string callerCtx = ExprBuilder::PhpCallerClass(method);
+
+                if (classToken == "parent") {
+                    *code << code->PushString(root->getClassName());
+                    *code << code->PushString(memberName);
+                    EmitValue(root, method, code, rhs);
+                    *code << code->PushString(callerCtx);
+                    *code << code->InvokeStatic(rtSetParentStaticPropCtx);
+                    return;
+                }
+
+                if (classToken == "self") {
+                    *code << code->PushString(root->getClassName());
+                    *code << code->InvokeStatic(rtRequireClass);
+                } else if (classToken == "static") {
+                    if (ExprBuilder::PhpMethodHasThis(method)) {
+                        *code << code->LoadReference(ExprBuilder::PhpThisLocalSlot());
+                        *code << code->InvokeVirtual(objGetPhpClass);
+                    } else {
+                        *code << code->LoadReference(0);
+                    }
+                } else {
+                    *code << code->PushString(classToken);
+                    *code << code->InvokeStatic(rtRequireClass);
+                }
+
+                *code << code->PushString(memberName);
+                EmitValue(root, method, code, rhs);
+                *code << code->PushString(callerCtx);
+                *code << code->InvokeStatic(rtSetStaticPropCtx);
                 return;
             }
 
-            // obj -> PhpObject
-            EmitValue(root, method, code, objExpr);
-            *code << code->InvokeVirtual(asObject);
+            // ---- $obj->prop = expr ----
+            if (lhs && lhs->type == ExprType::ET_PROPERTY_ACCESS) {
+                const ExprNode *objExpr = childOrNull(lhs, 0);
+                const ExprNode *nameExpr = childOrNull(lhs, 1);
 
-            // method name + args
-            *code << code->PushString(methodName);
-            emitArgsArray(root, method, code, argsNode);
+                std::string propName = idText(nameExpr);
+                if (propName.empty()) {
+                    Console::Warning("ET_ASSIGN(ET_PROPERTY_ACCESS): missing property name (pushing NULL)");
+                    *code << code->GetStatic(nullValueField);
+                    return;
+                }
 
-            // NEW: caller scope for PHP visibility checks
-            *code << code->PushString(ExprBuilder::PhpCallerClass(method));
+                EmitValue(root, method, code, objExpr);
+                *code << code->InvokeVirtual(asObject); // PhpObject
+                *code << code->PushString(propName);
+                EmitValue(root, method, code, rhs);
+                *code << code->PushString(ExprBuilder::PhpCallerClass(method));
+                *code << code->InvokeStatic(rtSetPropCtx);
+                return;
+            }
 
-            // call
-            *code << code->InvokeStatic(rtCallMethodCtx);
+            Console::Warning("ET_ASSIGN bytecode: unsupported lhs (pushing NULL)");
+            *code << code->GetStatic(nullValueField);
             return;
         }
 
@@ -1183,9 +1330,10 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
             }
 
             EmitValue(root, method, code, objExpr);
-            *code << code->InvokeVirtual(asObject);
-            *code << code->PushString(propName);
-            *code << code->InvokeVirtual(objGetProp);
+            *code << code->InvokeVirtual(asObject); // PhpObject
+            *code << code->PushString(propName); // name
+            *code << code->PushString(ExprBuilder::PhpCallerClass(method)); // caller ctx
+            *code << code->InvokeStatic(rtGetPropCtx); // BasePhpValue
             return;
         }
 
@@ -1739,6 +1887,90 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
                 *code << code->InvokeStatic(isInc ? add : sub); // new
                 *code << code->Duplicate();
                 storeVar();
+                return;
+            }
+        }
+
+        case ExprType::ET_STATIC_PROPERTY_ACCESS: {
+            const ExprNode *classExpr = childOrNull(expr, 0);
+            const ExprNode *memberExpr = childOrNull(expr, 1);
+
+            std::string classToken = lowerCopy(idText(classExpr));
+            if (classToken.empty()) {
+                Console::Warning("ET_STATIC_PROPERTY_ACCESS: missing class token (pushing NULL)");
+                *code << code->GetStatic(nullValueField);
+                return;
+            }
+
+            bool isStaticProp = (memberExpr && memberExpr->type == ExprType::ET_SIGIL);
+            std::string memberName = isStaticProp ? idText(childOrNull(memberExpr, 0)) : idText(memberExpr);
+
+            if (memberName.empty()) {
+                Console::Warning("ET_STATIC_PROPERTY_ACCESS: missing member name (pushing NULL)");
+                *code << code->GetStatic(nullValueField);
+                return;
+            }
+
+            std::string callerCtx = ExprBuilder::PhpCallerClass(method);
+
+            if (isStaticProp) {
+                // ---- static property read ----
+                if (classToken == "parent") {
+                    *code << code->PushString(root->getClassName()); // current class (lexical)
+                    *code << code->PushString(memberName); // prop name (no $)
+                    *code << code->PushString(callerCtx);
+                    *code << code->InvokeStatic(rtGetParentStaticPropCtx);
+                    return;
+                }
+
+                // resolve called class to PhpClass on stack
+                if (classToken == "self") {
+                    *code << code->PushString(root->getClassName());
+                    *code << code->InvokeStatic(rtRequireClass); // PhpClass
+                } else if (classToken == "static") {
+                    if (ExprBuilder::PhpMethodHasThis(method)) {
+                        *code << code->LoadReference(ExprBuilder::PhpThisLocalSlot()); // PhpObject
+                        *code << code->InvokeVirtual(objGetPhpClass); // PhpClass
+                    } else {
+                        *code << code->LoadReference(0); // PhpClass param in static methods
+                    }
+                } else {
+                    *code << code->PushString(classToken);
+                    *code << code->InvokeStatic(rtRequireClass); // PhpClass
+                }
+
+                *code << code->PushString(memberName);
+                *code << code->PushString(callerCtx);
+                *code << code->InvokeStatic(rtGetStaticPropCtx);
+                return;
+            } else {
+                // ---- class constant read ----
+                if (classToken == "parent") {
+                    *code << code->PushString(root->getClassName()); // current class (lexical)
+                    *code << code->PushString(memberName); // const name
+                    *code << code->PushString(callerCtx);
+                    *code << code->InvokeStatic(rtGetParentConstCtx);
+                    return;
+                }
+
+                if (classToken == "self") {
+                    *code << code->PushString(root->getClassName());
+                    *code << code->InvokeStatic(rtRequireClass);
+                } else if (classToken == "static") {
+                    if (ExprBuilder::PhpMethodHasThis(method)) {
+                        *code << code->LoadReference(ExprBuilder::PhpThisLocalSlot());
+                        *code << code->InvokeVirtual(objGetPhpClass);
+                    } else {
+                        *code << code->LoadReference(0);
+                    }
+                } else {
+                    *code << code->PushString(classToken);
+                    *code << code->InvokeStatic(rtRequireClass);
+                }
+
+                *code << code->PushString(memberName);
+                *code << code->PushString(callerCtx);
+                *code << code->InvokeStatic(rtGetConstCtx);
                 return;
             }
         }

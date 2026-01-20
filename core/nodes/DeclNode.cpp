@@ -549,6 +549,15 @@ Class *DeclNode::processClass(Class *root, std::vector<Class *> &list) {
 
     bool isOk = true;
 
+    auto visToInt = [&](VisibilityType v) -> int {
+        switch (v) {
+            case VISIBILITY_PROTECTED: return 2;
+            case VISIBILITY_PRIVATE: return 3;
+            case VISIBILITY_PUBLIC:
+            default: return 1;
+        }
+    };
+
     switch (type) {
         case DT_LIST: {
             for (auto *child: children) {
@@ -609,7 +618,6 @@ Class *DeclNode::processClass(Class *root, std::vector<Class *> &list) {
         case DT_FUNCTION: {
             std::string fn = toLowerAscii(name);
 
-            // Register signature (params types + byref, return types) for call-site checks.
             ExprBuilder::RegisterFunctionSignature(fn, params, valueType);
 
             Method *m = root->getOrCreateMethod(fn, descPhpFunction());
@@ -620,10 +628,8 @@ Class *DeclNode::processClass(Class *root, std::vector<Class *> &list) {
 
             AttributeCode *code = m->getCodeAttribute();
 
-            // Bind args in slot 0, locals start at slot 1 (and SetByRefLayout is done inside).
             emitBindParamsFromArgs(root, m, code, params, fn, /*argsSlot*/0, /*baseLocalSlot*/1);
 
-            // Allocate one local for the return value and set up a shared epilogue.
             uint16_t retSlot = ExprBuilder::AllocTempLocal(m);
             auto *L_epilogue = code->CodeLabel();
 
@@ -633,11 +639,9 @@ Class *DeclNode::processClass(Class *root, std::vector<Class *> &list) {
                 DescriptorField("com/phpjvm/BasePhpValue")
             );
 
-            // Default return is NULL_VALUE (PHP fall-through).
             *code << code->GetStatic(nullValueField);
             *code << code->StoreReference(retSlot);
 
-            // Make all "return expr;" store into retSlot and jump to L_epilogue.
             StmtNode::BeginReturnCtx(m, L_epilogue, retSlot);
 
             if (stmt) {
@@ -646,10 +650,8 @@ Class *DeclNode::processClass(Class *root, std::vector<Class *> &list) {
 
             StmtNode::EndReturnCtx(m);
 
-            // If body falls through (no explicit return), go to epilogue.
             *code << code->GoTo(L_epilogue);
 
-            // Epilogue: flush by-ref params, then return retSlot.
             *code << L_epilogue;
             ExprBuilder::EmitFlushByRefIfNeeded(root, m, code);
 
@@ -677,7 +679,6 @@ Class *DeclNode::processClass(Class *root, std::vector<Class *> &list) {
 
             AttributeCode *code = m->getCodeAttribute();
 
-            // args is in slot 1, locals start at slot 2
             emitBindParamsFromArgs(root, m, code, params, owner + "::" + mn, /*argsSlot*/1, /*baseLocalSlot*/2);
 
             uint16_t retSlot = ExprBuilder::AllocTempLocal(m);
@@ -716,8 +717,17 @@ Class *DeclNode::processClass(Class *root, std::vector<Class *> &list) {
             std::string fieldName = sanitizeJavaMemberIdent(name);
 
             Field *f = root->getOrCreateField(fieldName, DescriptorField("com/phpjvm/BasePhpValue"));
-            f->addFlag(Field::ACC_PUBLIC);
             f->addFlag(Field::ACC_STATIC);
+            // Keep JVM visibility roughly aligned (runtime enforces real PHP visibility)
+            switch (visibilityType) {
+                case VISIBILITY_PRIVATE: f->addFlag(Field::ACC_PRIVATE);
+                    break;
+                case VISIBILITY_PROTECTED: f->addFlag(Field::ACC_PROTECTED);
+                    break;
+                case VISIBILITY_PUBLIC:
+                default: f->addFlag(Field::ACC_PUBLIC);
+                    break;
+            }
 
             auto *fieldRef = root->getOrCreateFieldrefConstant(
                 root->getClassName(),
@@ -728,12 +738,83 @@ Class *DeclNode::processClass(Class *root, std::vector<Class *> &list) {
             Method *clinit = getOrCreateClinit(root);
             AttributeCode *cc = clinit->getCodeAttribute();
 
+            // PhpRuntime.defineConst(String className, String constName, int visibility, BasePhpValue value) : void
+            auto *defineConst = root->getOrCreateMethodrefConstant(
+                "com/phpjvm/PhpRuntime",
+                "defineConst",
+                DescriptorMethod(
+                    std::nullopt,
+                    {
+                        DescriptorField("java/lang/String"),
+                        DescriptorField("java/lang/String"),
+                        DescriptorField("I"),
+                        DescriptorField("com/phpjvm/BasePhpValue")
+                    }
+                )
+            );
+
+            int visInt = visToInt(visibilityType);
+
+            *cc << cc->PushString(root->getClassName());
+            *cc << cc->PushString(name);
+            *cc << cc->PushInt(visInt);
+
+            // value
             ExprBuilder::EmitValue(root, clinit, cc, expr);
+
+            // duplicate so we can both set the JVM field and register in runtime
+            *cc << cc->Duplicate();
             *cc << cc->PutStatic(fieldRef);
+
+            // register into PhpRuntime (same value still on stack)
+            *cc << cc->InvokeStatic(defineConst);
             break;
         }
 
-        case DT_PROPERTY:
+        case DT_PROPERTY: {
+            Method *clinit = getOrCreateClinit(root);
+            AttributeCode *cc = clinit->getCodeAttribute();
+
+            auto *nullValueField = root->getOrCreateFieldrefConstant(
+                "com/phpjvm/BasePhpValue",
+                "NULL_VALUE",
+                DescriptorField("com/phpjvm/BasePhpValue")
+            );
+
+            // PhpRuntime.defineProperty(String className, String propName, boolean isStatic, int visibility, BasePhpValue defaultValue) : void
+            auto *defineProperty = root->getOrCreateMethodrefConstant(
+                "com/phpjvm/PhpRuntime",
+                "defineProperty",
+                DescriptorMethod(
+                    std::nullopt,
+                    {
+                        DescriptorField("java/lang/String"),
+                        DescriptorField("java/lang/String"),
+                        DescriptorField("Z"),
+                        DescriptorField("I"),
+                        DescriptorField("com/phpjvm/BasePhpValue")
+                    }
+                )
+            );
+
+            int visInt = visToInt(visibilityType);
+            bool st = (isStatic == 1);
+
+            *cc << cc->PushString(root->getClassName());
+            *cc << cc->PushString(name);
+            *cc << cc->PushInt(st ? 1 : 0);
+            *cc << cc->PushInt(visInt);
+
+            if (expr) {
+                ExprBuilder::EmitValue(root, clinit, cc, expr);
+            } else {
+                *cc << cc->GetStatic(nullValueField);
+            }
+
+            *cc << cc->InvokeStatic(defineProperty);
+            break;
+        }
+
         case DT_PARAMETER:
             Warn("DeclNode::processClass: " + toString(type) + " not implemented yet");
             break;

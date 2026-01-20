@@ -30,9 +30,18 @@ static const EmbeddedClassFile kPhpRuntimeFiles[] = {
     },
     {"com/phpjvm/BasePhpValue$Type.class", BasePhpValue_Type_class, BasePhpValue_Type_class_len},
     {"com/phpjvm/PhpClass.class", PhpClass_class, PhpClass_class_len},
+    {"com/phpjvm/PhpClass$DeclaredConst.class", PhpClass_DeclaredConst_class, PhpClass_DeclaredConst_class_len},
+    {
+        "com/phpjvm/PhpClass$DeclaredProperty.class",
+        PhpClass_DeclaredProperty_class,
+        PhpClass_DeclaredProperty_class_len
+    },
+    {"com/phpjvm/PhpClass$Visibility.class", PhpClass_Visibility_class, PhpClass_Visibility_class_len},
     {"com/phpjvm/PhpMethod.class", PhpMethod_class, PhpMethod_class_len},
     {"com/phpjvm/PhpObject.class", PhpObject_class, PhpObject_class_len},
     {"com/phpjvm/PhpRuntime.class", PhpRuntime_class, PhpRuntime_class_len},
+    {"com/phpjvm/PhpRuntime$ConstLookup.class", PhpRuntime_ConstLookup_class, PhpRuntime_ConstLookup_class_len},
+    {"com/phpjvm/PhpRuntime$PropLookup.class", PhpRuntime_PropLookup_class, PhpRuntime_PropLookup_class_len},
     {"com/phpjvm/PhpStaticMethod.class", PhpStaticMethod_class, PhpStaticMethod_class_len},
     {"com/phpjvm/PhpRef.class", PhpRef_class, PhpRef_class_len},
     {
