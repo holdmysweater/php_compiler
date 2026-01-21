@@ -227,7 +227,7 @@ INTERFACE   [Ii][Nn][Tt][Ee][Rr][Ff][Aa][Cc][Ee]
 									BEGIN(states->popAndPeek());
 								}
 
-<PURE_PHP,ARRAY_CONTENT>\'	{ BEGIN(states->pushAndPeek(STRING_SINGLE_QUOTES)); buffer->reset(); buffer->setStartLine(yylineno); }
+<PURE_PHP,ARRAY_CONTENT,INTERPOLATED_PHP>\'	{ BEGIN(states->pushAndPeek(STRING_SINGLE_QUOTES)); buffer->reset(); buffer->setStartLine(yylineno); }
 <STRING_SINGLE_QUOTES>\\\n			{ buffer->append(yytext); }
 <STRING_SINGLE_QUOTES>\\\'			{ buffer->append("\'"); }
 <STRING_SINGLE_QUOTES>\\\\     		{ buffer->append("\\"); }

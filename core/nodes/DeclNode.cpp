@@ -287,6 +287,15 @@ static void emitBindParamsFromArgs(
         )
     );
 
+    auto *passByValue = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/BasePhpValue",
+        "passByValue",
+        DescriptorMethod(
+            DescriptorField("com/phpjvm/BasePhpValue"),
+            {DescriptorField("com/phpjvm/BasePhpValue")}
+        )
+    );
+
     std::vector<DeclNode *> ps = flattenParamList(params);
 
     // count required params (no default expr)
@@ -351,6 +360,7 @@ static void emitBindParamsFromArgs(
             *code << code->LoadReference(argsSlot);
             *code << code->PushInt(static_cast<int32_t>(i));
             *code << code->LoadReferenceFromArray();
+            *code << code->InvokeStatic(passByValue);
             *code << code->StoreReference(valueSlot);
         } else {
             *code << code->LoadReference(argsSlot);
@@ -378,6 +388,8 @@ static void emitBindParamsFromArgs(
         } else {
             if (p && p->expr) ExprBuilder::EmitValue(root, m, code, p->expr);
             else *code << code->GetStatic(nullValueField);
+
+            *code << code->InvokeStatic(passByValue);
             *code << code->StoreReference(valueSlot);
         }
 
