@@ -267,7 +267,7 @@ while_statement : WHILE '(' expression ')' statement                        { Co
                 ;
 
 for_statement : FOR '(' expression_list_empty ';' expression_list_empty ';' expression_list_empty ')' statement                     { Console::ParserLog("for_statement (FOR '(' expression_list_empty ';' expression_list_empty ';' expression_list_empty ')' statement)"); $$ = StmtNode::For($3, $5, $7, $9); }
-              | FOR '(' expression_list_empty ';' expression_list_empty ';' expression_list_empty ')' ':' statement_list ENDFOR ';' { Console::ParserLog("for_statement (FOR '(' expression_list_empty ';' expression_list_empty ';' expression_list_empty ')' ':' statement_list ENDFOR ';')"); $$ = StmtNode::For($3, $5, $7, $10); }
+              | FOR '(' expression_list_empty ';' expression_list_empty ';' expression_list_empty ')' ':' statement_list_empty ENDFOR ';' { Console::ParserLog("for_statement (FOR '(' expression_list_empty ';' expression_list_empty ';' expression_list_empty ')' ':' statement_list ENDFOR ';')"); $$ = StmtNode::For($3, $5, $7, $10); }
               ;
 
 foreach_statement : FOREACH '(' expression AS '$' ID KEY_ACCESS '$' ID ')' statement                            { Console::ParserLog("foreach_statement (FOREACH '(' expression AS '$' ID KEY_ACCESS '$' ID ')' statement)"); $$ = StmtNode::ForEachKeyValue($3, ExprNode::Id($6), ExprNode::Id($9), $11); }
