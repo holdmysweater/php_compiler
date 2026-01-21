@@ -110,6 +110,70 @@ const std::vector<ExprBuilder::ByRefPair> *ExprBuilder::GetByRefLayout(jvm::Meth
     return &it->second;
 }
 
+static void emitLoadLocalVarChecked(
+    Class *root,
+    AttributeCode *code,
+    uint16_t slot,
+    ConstantFieldref *nullValueField,
+    const std::string &varName
+) {
+    auto *rtUndefVar = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/PhpRuntime",
+        "undefinedVariable",
+        DescriptorMethod(
+            DescriptorField("com/phpjvm/BasePhpValue"),
+            {DescriptorField("java/lang/String")}
+        )
+    );
+
+    auto *L_nonNull = code->CodeLabel();
+    auto *L_end = code->CodeLabel();
+
+    *code << code->LoadReference(slot);
+    *code << code->Duplicate();
+    *code << code->IfNotNull(L_nonNull);
+
+    *code << code->PopOne();
+    *code << code->PushString(normalizeVarName(varName)); // or keep "$x" formatting as you prefer
+    *code << code->InvokeStatic(rtUndefVar); // throws OR returns NULL_VALUE
+    *code << code->GoTo(L_end);
+
+    *code << L_nonNull;
+    *code << L_end;
+}
+
+static void emitLoadGlobalVarChecked(
+    Class *root,
+    AttributeCode *code,
+    ConstantFieldref *fieldRef,
+    ConstantFieldref *nullValueField,
+    const std::string &varName
+) {
+    auto *rtUndefVar = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/PhpRuntime",
+        "undefinedVariable",
+        DescriptorMethod(
+            DescriptorField("com/phpjvm/BasePhpValue"),
+            {DescriptorField("java/lang/String")}
+        )
+    );
+
+    auto *L_nonNull = code->CodeLabel();
+    auto *L_end = code->CodeLabel();
+
+    *code << code->GetStatic(fieldRef);
+    *code << code->Duplicate();
+    *code << code->IfNotNull(L_nonNull);
+
+    *code << code->PopOne();
+    *code << code->PushString(normalizeVarName(varName));
+    *code << code->InvokeStatic(rtUndefVar);
+    *code << code->GoTo(L_end);
+
+    *code << L_nonNull;
+    *code << L_end;
+}
+
 void ExprBuilder::EmitFlushByRefIfNeeded(jvm::Class *root, jvm::Method *method, jvm::AttributeCode *code) {
     if (!root || !method || !code) return;
 
@@ -777,6 +841,15 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
         )
     );
 
+    auto *rtUndefVar = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/PhpRuntime",
+        "undefinedVariable",
+        DescriptorMethod(
+            DescriptorField("com/phpjvm/BasePhpValue"),
+            {DescriptorField("java/lang/String")}
+        )
+    );
+
     auto *arrFactory = root->getOrCreateMethodrefConstant(
         "com/phpjvm/BasePhpValue",
         "array",
@@ -1245,14 +1318,22 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
 
             uint16_t localIndex = 0;
 
-            if (allocLocalIfInScope(method, var, localIndex)) {
-                emitLoadLocalVar(code, localIndex, nullValueField);
+            // 1) If local exists -> load checked
+            if (ExprBuilder::TryGetLocal(method, var, localIndex)) {
+                emitLoadLocalVarChecked(root, code, localIndex, nullValueField, var);
                 return;
             }
 
-            // Not in a local scope => global
+            // 2) If we ARE in a local scope but var not in map => undefined local
+            if (g_localScopes.find(method) != g_localScopes.end()) {
+                *code << code->PushString(normalizeVarName(var));
+                *code << code->InvokeStatic(rtUndefVar); // throws or returns NULL_VALUE
+                return;
+            }
+
+            // 3) Otherwise treat as global (checked)
             auto *fieldRef = ensureGlobalVarField(root, var);
-            emitLoadGlobalVar(root, code, fieldRef, nullValueField);
+            emitLoadGlobalVarChecked(root, code, fieldRef, nullValueField, var);
             return;
         }
 
@@ -1992,10 +2073,10 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
             bool isLocal = allocLocalIfInScope(method, var, localIndex);
 
             if (isLocal) {
-                emitLoadLocalVar(code, localIndex, nullValueField);
+                emitLoadLocalVarChecked(root, code, localIndex, nullValueField, var);
             } else {
                 auto *fieldRef = ensureGlobalVarField(root, var);
-                emitLoadGlobalVar(root, code, fieldRef, nullValueField);
+                emitLoadGlobalVarChecked(root, code, fieldRef, nullValueField, var);
             }
 
             EmitValue(root, method, code, rhs);
@@ -2069,8 +2150,8 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
                     (expr->type == ExprType::ET_DECREMENT_POST);
 
             auto loadVar = [&]() {
-                if (isLocal) emitLoadLocalVar(code, localIndex, nullValueField);
-                else emitLoadGlobalVar(root, code, fieldRef, nullValueField);
+                if (isLocal) emitLoadLocalVarChecked(root, code, localIndex, nullValueField, var);
+                else emitLoadGlobalVarChecked(root, code, fieldRef, nullValueField, var);
             };
 
             auto storeVar = [&]() {
