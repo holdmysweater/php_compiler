@@ -47,6 +47,64 @@ static bool declTreeHasMethodNamed(DeclNode *n, const std::string &wantLower) {
     return false;
 }
 
+static void flattenMemberDecls(DeclNode *n, std::vector<DeclNode *> &out) {
+    if (!n) return;
+    if (n->type == DT_LIST) {
+        for (auto *ch: n->children) flattenMemberDecls(ch, out);
+        return;
+    }
+    out.push_back(n);
+}
+
+static bool checkDuplicateClassMembers(DeclNode *declList, const std::string &classLower) {
+    bool ok = true;
+
+    std::unordered_set<std::string> seenMethods; // PHP methods are case-insensitive -> use lower
+    std::unordered_set<std::string> seenProps; // properties are case-sensitive in PHP
+    std::unordered_set<std::string> seenConsts; // constants are case-sensitive
+
+    std::vector<DeclNode *> members;
+    flattenMemberDecls(declList, members);
+
+    for (auto *d: members) {
+        if (!d) continue;
+
+        std::string key = toLowerAscii(d->name); // already lowered by doSemantics, but safe
+
+        switch (d->type) {
+            case DT_METHOD: {
+                if (!seenMethods.insert(key).second) {
+                    Console::Error("Cannot redeclare method " + classLower + "::" + key + "()");
+                    ok = false;
+                }
+                break;
+            }
+
+            case DT_PROPERTY: {
+                if (!seenProps.insert(key).second) {
+                    Console::Error("Cannot redeclare property " + classLower + "::$" + key);
+                    ok = false;
+                }
+                break;
+            }
+
+            case DT_CONSTANT: {
+                std::string key = d->name;
+                if (!seenConsts.insert(key).second) {
+                    Console::Error("Cannot redeclare class constant " + classLower + "::" + key);
+                    ok = false;
+                }
+                break;
+            }
+
+            default:
+                break;
+        }
+    }
+
+    return ok;
+}
+
 // Add near the top of DeclNode.cpp (helpers)
 static std::string sanitizeJavaMemberIdent(const std::string &raw) {
     std::string s = raw;
@@ -566,8 +624,13 @@ bool DeclNode::doSemantics() {
         case DT_INTERFACE:
         case DT_CLASS:
             for (char &c: name) c = tolower(static_cast<unsigned char>(c));
-            if (declList != nullptr) isOk = isOk && declList->doSemantics();
+
+            if (declList != nullptr) {
+                isOk = isOk && declList->doSemantics();
+                isOk = isOk && checkDuplicateClassMembers(declList, name);
+            }
             break;
+
 
         case DT_PROPERTY:
             if (expr != nullptr) expr->doSemantics();
