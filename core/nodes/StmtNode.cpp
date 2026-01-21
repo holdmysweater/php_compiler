@@ -346,11 +346,16 @@ bool StmtNode::doSemantics() {
 
         case ST_SWITCH: {
             // Check if there's multiple default cases
-            for (const auto &child: children) {
-                if (isFoundDefaultCase && child->type == ST_CASE_DEFAULT) {
-                    isOk = false;
-                    Error("ST_SWITCH has multiple default cases");
-                    break;
+            if (this->stmt != nullptr && this->stmt->type == ST_STMT_LIST) {
+                for (const auto &child: this->stmt->children) {
+                    if (isFoundDefaultCase && child->type == ST_CASE_DEFAULT) {
+                        isOk = false;
+                        Error("ST_SWITCH has multiple default cases");
+                        break;
+                    }
+                    if (child->type == ST_CASE_DEFAULT) {
+                        isFoundDefaultCase = true;
+                    }
                 }
             }
 
