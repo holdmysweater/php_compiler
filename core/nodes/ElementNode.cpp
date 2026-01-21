@@ -5,6 +5,14 @@
 
 using json = nlohmann::json;
 
+#include <unordered_map>
+#include <cctype>
+
+static std::string toLowerAscii(std::string s) {
+    for (char &c: s) c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
+    return s;
+}
+
 string ElementNode::_getClassName() const {
     return "ElementNode";
 }
@@ -100,11 +108,36 @@ bool ElementNode::doSemantics() {
         case ELEMENT_EMPTY:
             Warn("empty");
             return true;
-        case ELEMENT_PROGRAM_LIST:
+        case ELEMENT_PROGRAM_LIST: {
+            // Pass 1: detect duplicate top-level function decls
+            std::unordered_map<std::string, const DeclNode *> firstFunc;
+
             for (const auto &child: children) {
+                if (!child) continue;
+
+                // your JSON shows child->decl holds DT_FUNCTION for ELEMENT_FUNCTION
+                if (child->decl && child->decl->type == DeclType::DT_FUNCTION) {
+                    std::string fn = toLowerAscii(child->decl->name);
+
+                    auto it = firstFunc.find(fn);
+                    if (it != firstFunc.end()) {
+                        isOk = false;
+                        Error("Cannot redeclare function " + fn + "()");
+                        // optional: also log previous id
+                        // Error("Previously declared at decl id " + std::to_string(it->second->GetId()));
+                    } else {
+                        firstFunc.emplace(fn, child->decl);
+                    }
+                }
+            }
+
+            // Pass 2: normal semantic recursion
+            for (const auto &child: children) {
+                if (!child) continue;
                 isOk = isOk && child->doSemantics();
             }
             break;
+        }
         case ELEMENT_STATEMENT:
         case ELEMENT_CLASS_DECL:
         case ELEMENT_INTERFACE_DECL:

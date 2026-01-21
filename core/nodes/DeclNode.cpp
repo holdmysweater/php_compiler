@@ -3,6 +3,7 @@
 #include "json.hpp"
 #include <string>
 #include <cctype>
+#include <unordered_set>
 #include <vector>
 
 #include "jvm/class.h"
@@ -23,6 +24,8 @@ static std::string toLowerAscii(std::string s) {
     for (char &c: s) c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
     return s;
 }
+
+static thread_local std::unordered_map<jvm::Class *, std::unordered_set<std::string> > g_emittedFunctions;
 
 static std::unordered_map<jvm::Class *, bool> g_classHasMagicCtor;
 
@@ -554,7 +557,25 @@ bool DeclNode::doSemantics() {
         case DT_FUNCTION:
         case DT_METHOD:
             for (char &c: name) c = tolower(static_cast<unsigned char>(c));
-            if (params != nullptr) isOk = isOk && params->doSemantics();
+
+            if (params != nullptr) {
+                isOk = isOk && params->doSemantics();
+
+                std::unordered_set<std::string> seen;
+                for (auto *p: flattenParamList(params)) {
+                    if (!p) continue;
+                    const std::string &pn = p->name;
+                    if (pn.empty()) continue;
+
+                    if (!seen.insert(pn).second) {
+                        Error("Duplicate parameter $" + pn + " in " +
+                              std::string(type == DT_FUNCTION ? "function " : "method ") + name);
+                        isOk = false;
+                        break;
+                    }
+                }
+            }
+
             if (stmt != nullptr) isOk = isOk && stmt->doSemantics();
             break;
 
@@ -646,6 +667,11 @@ Class *DeclNode::processClass(Class *root, std::vector<Class *> &list) {
             std::string fn = toLowerAscii(name);
 
             ExprBuilder::RegisterFunctionSignature(fn, params, valueType);
+
+            auto &seen = g_emittedFunctions[root];
+            if (!seen.insert(fn).second) {
+                throw std::runtime_error("Cannot redeclare function " + fn + "()");
+            }
 
             Method *m = root->getOrCreateMethod(fn, descPhpFunction());
             ExprBuilder::SetPhpMethodHasThis(m, false);
