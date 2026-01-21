@@ -1947,6 +1947,9 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
             const ExprNode *objExpr = childOrNull(expr, 0);
             const ExprNode *nameExpr = childOrNull(expr, 1);
 
+            // NEW: your AST may store call arguments directly as the 3rd child
+            const ExprNode *argsNode = (expr->children.size() >= 3) ? childOrNull(expr, 2) : nullptr;
+
             std::string methodName = lowerCopy(idText(nameExpr));
             if (methodName.empty()) {
                 Console::Warning("ET_METHOD_ACCESS: missing method name (pushing NULL)");
@@ -1954,16 +1957,21 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
                 return;
             }
 
-            auto *basePhpValueClass = root->getOrCreateClassConstant("com/phpjvm/BasePhpValue");
-
             // object -> PhpObject
             EmitValue(root, method, code, objExpr); // BasePhpValue
             *code << code->InvokeVirtual(asObject); // PhpObject
 
-            // callMethodCtx(obj, "method", [], callerCtx)
+            // callMethodCtx(obj, "method", args, callerCtx)
             *code << code->PushString(methodName);
-            *code << code->PushInt(0);
-            *code << code->NewArray(basePhpValueClass); // BasePhpValue[0]
+
+            if (argsNode) {
+                emitArgsArray(root, method, code, argsNode); // <-- FIX: emit real args
+            } else {
+                auto *basePhpValueClass = root->getOrCreateClassConstant("com/phpjvm/BasePhpValue");
+                *code << code->PushInt(0);
+                *code << code->NewArray(basePhpValueClass);
+            }
+
             *code << code->PushString(ExprBuilder::PhpCallerClass(method));
             *code << code->InvokeStatic(rtCallMethodCtx);
             return;
