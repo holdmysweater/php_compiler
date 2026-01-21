@@ -474,6 +474,7 @@ bool StmtNode::doSemantics() {
         case ST_FINALLY:
         case ST_CATCH:
         case ST_THROW:
+        case ST_TRY:
         case ST_CASE:
         case ST_CASE_DEFAULT:
         case ST_ECHO:
