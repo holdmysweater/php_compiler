@@ -309,6 +309,9 @@ INTERFACE   [Ii][Nn][Tt][Ee][Rr][Ff][Aa][Cc][Ee]
                                         }
                                     }
 
+<INDENT_HEREDOC_OR_NOWDOC>^{ID}	{ if (string(yytext, strcspn(yytext, ";")) != buffer->getDocId()) { buffer->append(yytext); }
+                                  else { Console::LexError("Expected ';' in HEREDO/NOWDOC", buffer->getStartLine()); return ERROR; } }
+
 <STRING_NOWDOC,STRING_HEREDOC>[\t ]+    { buffer->append(yytext); }
 <STRING_NOWDOC,STRING_HEREDOC>{ID};	    {
                                             if (string(yytext, strcspn(yytext, ";")) != buffer->getDocId()) {
@@ -340,6 +343,12 @@ INTERFACE   [Ii][Nn][Tt][Ee][Rr][Ff][Aa][Cc][Ee]
                                                 return STRING;
                                             }
                                         }
+
+<STRING_NOWDOC,STRING_HEREDOC>{ID}	    {
+                                            if (string(yytext, strcspn(yytext, ";")) != buffer->getDocId()) {
+                                                buffer->append(yytext);
+                                            }
+                                            else { Console::LexError("Expected ';' in HEREDO/NOWDOC", buffer->getStartLine()); return ERROR; } }
 
 <STRING_NOWDOC>[^\n]+                   { buffer->append(yytext); }
 
