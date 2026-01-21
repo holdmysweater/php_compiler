@@ -642,6 +642,7 @@ INTERFACE   [Ii][Nn][Tt][Ee][Rr][Ff][Aa][Cc][Ee]
 <PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"&&"  	{ Console::LexLog(yylineno, yytext, "operator '&&'"); return LOGIC_AND; }
 <PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"||"  	{ Console::LexLog(yylineno, yytext, "operator '||'"); return LOGIC_OR; }
 <PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"??"  	{ Console::LexLog(yylineno, yytext, "operator '??'"); return NULL_COALESCING; }
+<PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"?:"  	{ Console::LexLog(yylineno, yytext, "operator '?:'"); return ELVIS; }
 <PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"++"      { Console::LexLog(yylineno, yytext, "operator '++'"); return INCREMENT; }
 <PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"--"      { Console::LexLog(yylineno, yytext, "operator '--'"); return DECREMENT; }
 <PURE_PHP,INTERPOLATED_PHP,ARRAY_CONTENT>"&"   	{ Console::LexLog(yylineno, yytext, "operator '&'"); return *yytext; }

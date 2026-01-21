@@ -82,6 +82,7 @@
 %token FINALLY
 %token INTERFACE
 
+%nonassoc ELVIS
 %left OR
 %left AND
 %left XOR
@@ -135,6 +136,7 @@ expression : expression LOGIC_OR expression                 { Console::ParserLog
           | expression '|' expression                       { Console::ParserLog("expression (expression '|' expression)"); $$ = ExprNode::OrBitwise($1, $3); }
           | expression '&' expression                       { Console::ParserLog("expression (expression '&' expression)"); $$ = ExprNode::AndBitwise($1, $3); }
           | expression '=' expression                       { Console::ParserLog("expression (expression '=' expression)"); $$ = ExprNode::Assign($1, $3); }
+          | expression ELVIS expression                     { Console::ParserLog("expression (expression '?:' expression)"); $$ = ExprNode::Ternary($1, $1, $3); }
           | expression '?' expression ':' expression        { Console::ParserLog("expression (expression '?' expression ':' expression)"); $$ = ExprNode::Ternary($1, $3, $5); }
           | expression MULT_ASSIGN expression               { Console::ParserLog("expression (expression MULT_ASSIGN expression)"); $$ = ExprNode::MultAssign($1, $3); }
           | expression POW_ASSIGN expression                { Console::ParserLog("expression (expression POW_ASSIGN expression)"); $$ = ExprNode::PowAssign($1, $3); }
