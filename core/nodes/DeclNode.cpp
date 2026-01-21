@@ -231,6 +231,33 @@ static void emitBindParamsFromArgs(
 
     std::vector<DeclNode *> ps = flattenParamList(params);
 
+    // count required params (no default expr)
+    int32_t required = 0;
+    for (auto *p: ps) {
+        if (p && p->expr == nullptr) required++;
+    }
+
+    auto *rtAssertArgCount = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/PhpRuntime",
+        "assertArgCount",
+        DescriptorMethod(
+            std::nullopt,
+            {
+                DescriptorField("com/phpjvm/BasePhpValue", 1), // BasePhpValue[]
+                DescriptorField("I"), // required
+                DescriptorField("I"), // total
+                DescriptorField("java/lang/String") // fnName
+            }
+        )
+    );
+
+    // PhpRuntime.assertArgCount(args, required, total, fnName)
+    *code << code->LoadReference(argsSlot);
+    *code << code->PushInt(required);
+    *code << code->PushInt((int32_t) ps.size());
+    *code << code->PushString(fnName);
+    *code << code->InvokeStatic(rtAssertArgCount);
+
     // ✅ Create scope immediately so DefineLocal works
     ExprBuilder::BeginLocalScope(m, baseLocalSlot);
 
