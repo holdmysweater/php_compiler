@@ -1280,15 +1280,6 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
             emitUnary(root, method, code, childOrNull(expr, 0), boolNot, &ExprBuilder::EmitValue);
             return;
         }
-        case ExprType::ET_AND: {
-            emitBinary(root, method, code, childOrNull(expr, 0), childOrNull(expr, 1), boolAnd,
-                       &ExprBuilder::EmitValue);
-            return;
-        }
-        case ExprType::ET_OR: {
-            emitBinary(root, method, code, childOrNull(expr, 0), childOrNull(expr, 1), boolOr, &ExprBuilder::EmitValue);
-            return;
-        }
 
         case ExprType::ET_SIGIL: {
             const ExprNode *id = childOrNull(expr, 0);
@@ -1991,13 +1982,67 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
             return;
         }
 
+        case ExprType::ET_AND:
         case ExprType::ET_AND_LOWER: {
-            emitBinary(root, method, code, childOrNull(expr, 0), childOrNull(expr, 1), boolAnd,
-                       &ExprBuilder::EmitValue);
+            const ExprNode *a = childOrNull(expr, 0);
+            const ExprNode *b = childOrNull(expr, 1);
+
+            auto *L_false = code->CodeLabel();
+            auto *L_end = code->CodeLabel();
+
+            // if (!toBool(a)) => false (do NOT eval b)
+            EmitValue(root, method, code, a);
+            *code << code->InvokeVirtual(toBool);
+            *code << code->If(Instruction::Compare::Equal, L_false);
+
+            // if (!toBool(b)) => false
+            EmitValue(root, method, code, b);
+            *code << code->InvokeVirtual(toBool);
+            *code << code->If(Instruction::Compare::Equal, L_false);
+
+            // true
+            *code << code->PushInt(1);
+            *code << code->InvokeStatic(ofBool);
+            *code << code->GoTo(L_end);
+
+            // false
+            *code << L_false;
+            *code << code->PushInt(0);
+            *code << code->InvokeStatic(ofBool);
+
+            *code << L_end;
             return;
         }
+
+        case ExprType::ET_OR:
         case ExprType::ET_OR_LOWER: {
-            emitBinary(root, method, code, childOrNull(expr, 0), childOrNull(expr, 1), boolOr, &ExprBuilder::EmitValue);
+            const ExprNode *a = childOrNull(expr, 0);
+            const ExprNode *b = childOrNull(expr, 1);
+
+            auto *L_true = code->CodeLabel();
+            auto *L_end = code->CodeLabel();
+
+            // if (toBool(a)) => true (do NOT eval b)
+            EmitValue(root, method, code, a);
+            *code << code->InvokeVirtual(toBool);
+            *code << code->If(Instruction::Compare::NotEqual, L_true);
+
+            // if (toBool(b)) => true
+            EmitValue(root, method, code, b);
+            *code << code->InvokeVirtual(toBool);
+            *code << code->If(Instruction::Compare::NotEqual, L_true);
+
+            // false
+            *code << code->PushInt(0);
+            *code << code->InvokeStatic(ofBool);
+            *code << code->GoTo(L_end);
+
+            // true
+            *code << L_true;
+            *code << code->PushInt(1);
+            *code << code->InvokeStatic(ofBool);
+
+            *code << L_end;
             return;
         }
 
