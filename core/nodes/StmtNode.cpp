@@ -47,6 +47,23 @@ static uint16_t allocTempAny(jvm::Method *method) {
     return next++;
 }
 
+static StmtNode *normalizeElif(StmtNode *n) {
+    if (!n) return nullptr;
+    if (n->type != ST_STMT_LIST) return n;
+
+    StmtNode *head = nullptr;
+    StmtNode *prev = nullptr;
+
+    for (auto *c: n->children) {
+        if (!c || c->type != ST_ELSE_IF) continue;
+        if (!head) head = c;
+        if (prev) prev->elseIfStmt = c;
+        prev = c;
+    }
+    return head;
+}
+
+
 string StmtNode::_getClassName() const {
     return "StmtNode";
 }
@@ -734,9 +751,41 @@ AttributeCode *StmtNode::addStmt(Class *root, Method *method, AttributeCode *cod
             // else/elseif entry
             *code << L_next;
 
-            // else-if chain
-            const StmtNode *elif = elseIfStmt;
-            while (elif != nullptr && elif->type == ST_ELSE_IF) {
+            // --- else-if collection helper ---
+            auto collectElifs = [&](const StmtNode *n) {
+                std::vector<const StmtNode *> out;
+
+                if (!n) return out;
+
+                // Case 1: parser produced a stmt_list of ST_ELSE_IF
+                if (n->type == ST_STMT_LIST) {
+                    for (auto *c: n->children) {
+                        if (!c) continue;
+                        if (c->type == ST_ELSE_IF) out.push_back(c);
+                        else Warn("ST_IF: elif list contains non-ELSE_IF node: " + toString(c->type));
+                    }
+                    return out;
+                }
+
+                // Case 2: linked chain via elseIfStmt pointers
+                const StmtNode *p = n;
+                while (p && p->type == ST_ELSE_IF) {
+                    out.push_back(p);
+                    p = p->elseIfStmt;
+                }
+
+                // Case 3: single ST_ELSE_IF without chaining: handled above (out size 1)
+                // Anything else: ignore but warn
+                if (out.empty() && n->type != ST_ELSE_IF) {
+                    Warn("ST_IF: elseIfStmt is not ST_ELSE_IF or ST_STMT_LIST, got " + toString(n->type));
+                }
+
+                return out;
+            };
+
+            // else-if blocks
+            auto elifs = collectElifs(elseIfStmt);
+            for (auto *elif: elifs) {
                 auto *L_elifNext = code->CodeLabel();
 
                 emitJumpIfFalse(elif->condition, L_elifNext);
@@ -745,10 +794,6 @@ AttributeCode *StmtNode::addStmt(Class *root, Method *method, AttributeCode *cod
                 *code << code->GoTo(L_end);
 
                 *code << L_elifNext;
-
-                // Support chaining via elif->elseIfStmt (even if your factory doesn't set it,
-                // your parser might). If not set, chain ends.
-                elif = elif->elseIfStmt;
             }
 
             // else block (your AST often wraps it as ST_ELSE with .stmt)
@@ -1293,6 +1338,7 @@ StmtNode *StmtNode::If_ElifElse(ExprNode *condition, StmtNode *stmt, StmtNode *e
     node->stmt = stmt;
     node->elseIfStmt = elseIfStmt;
     node->elseStmt = elseStmt;
+    node->elseIfStmt = normalizeElif(elseIfStmt);
     node->WriteToFiles();
     return node;
 }
