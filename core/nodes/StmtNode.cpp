@@ -344,7 +344,7 @@ bool StmtNode::doSemantics() {
             }
             break;
 
-        case ST_SWITCH:
+        case ST_SWITCH: {
             // Check if there's multiple default cases
             for (const auto &child: children) {
                 if (isFoundDefaultCase && child->type == ST_CASE_DEFAULT) {
@@ -352,119 +352,124 @@ bool StmtNode::doSemantics() {
                     Error("ST_SWITCH has multiple default cases");
                     break;
                 }
-
-                if (child->type == ST_CASE_DEFAULT) {
-                    isFoundDefaultCase = true;
-                }
             }
 
-            // Change to do-while
-            this->type = ST_STMT_LIST;
-            this->children.clear();
             if (this->stmt == nullptr) {
+                this->type = ST_STMT_LIST;
+                this->children.clear();
                 this->expr = nullptr;
                 Warn("ST_SWITCH is empty");
                 break;
             }
 
-            initMatched = StmtNode::ExprStmt(
-                ExprNode::Assign(
-                    ExprNode::Sigil(ExprNode::Id(new string("___F___"))),
-                    ExprNode::Int(0)
+            // ---- make unique temp names so nested switches don't clash
+            std::string sid = std::to_string(this->GetId());
+            auto *SW_VAL = new std::string("___SW_VAL_" + sid + "___");
+            auto *SW_START = new std::string("___SW_START_" + sid + "___");
+
+            auto *swValExpr = ExprNode::Sigil(ExprNode::Id(SW_VAL));
+            auto *swStartExpr = ExprNode::Sigil(ExprNode::Id(SW_START));
+
+            // Collect labels (keep order). Each label corresponds to one "case/default" item.
+            struct Label {
+                bool isDefault;
+                ExprNode *caseExpr;
+                StmtNode *body;
+            };
+            std::vector<Label> labels;
+            int defaultIndex = -1;
+
+            for (auto *c: this->stmt->children) {
+                if (!c) continue;
+                if (c->type == ST_CASE_DEFAULT) {
+                    defaultIndex = (defaultIndex == -1) ? (int) labels.size() : defaultIndex;
+                    labels.push_back({true, nullptr, c->stmt});
+                } else if (c->type == ST_CASE) {
+                    labels.push_back({false, c->expr, c->stmt});
+                } else {
+                    isOk = false;
+                    Error("invalid case");
+                }
+            }
+
+            int n = (int) labels.size();
+
+            // Rewrite this node into ST_STMT_LIST
+            this->type = ST_STMT_LIST;
+            this->children.clear();
+
+            // 1) $__sw_val = <switch expr>;
+            this->children.push_back(
+                StmtNode::ExprStmt(
+                    ExprNode::Assign(swValExpr, this->expr)
                 )
             );
 
+            // 2) $__sw_start = -1;
+            this->children.push_back(
+                StmtNode::ExprStmt(
+                    ExprNode::Assign(swStartExpr, ExprNode::Int(-1))
+                )
+            );
 
-            this->children.push_back(initMatched);
+            // 3) find first matching case: if ($__sw_start == -1 && $__sw_val == caseExpr) $__sw_start = i;
+            for (int i = 0; i < n; i++) {
+                if (labels[i].isDefault) continue;
 
-            doWhileBody = StmtNode::StmtList(nullptr);
-
-            for (const auto &caseChild: this->stmt->children) {
-                switch (caseChild->type) {
-                    case ST_CASE_DEFAULT:
-                        exprNode = ExprNode::GreatOrEqual(
-                            ExprNode::Sigil(ExprNode::Id(new string("___F___"))),
-                            ExprNode::Int(1)
+                auto *cond =
+                        ExprNode::AndLower(
+                            ExprNode::Equal(swStartExpr, ExprNode::Int(-1)),
+                            ExprNode::Equal(swValExpr, labels[i].caseExpr)
                         );
-                        break;
-                    case ST_CASE:
-                        exprNode = ExprNode::OrLower(
-                            ExprNode::Equal(this->expr, caseChild->expr),
-                            ExprNode::Equal(
-                                ExprNode::Sigil(ExprNode::Id(new string("___F___"))),
-                                ExprNode::Int(1)
-                            )
-                        );
-                        break;
-                    default:
-                        isOk = false;
-                        Error("invalid case");
-                        continue;
-                }
 
-                StmtNode::AppendToStmtList(
-                    doWhileBody,
+                this->children.push_back(
                     StmtNode::If(
-                        exprNode,
-                        StmtNode::AppendToStmtList(
-                            StmtNode::StmtList(
-                                StmtNode::ExprStmt(
-                                    ExprNode::Assign(
-                                        ExprNode::Sigil(ExprNode::Id(new string("___F___"))),
-                                        ExprNode::Int(1)
-                                    )
-                                )
-                            ),
-                            caseChild->stmt
+                        cond,
+                        StmtNode::ExprStmt(
+                            ExprNode::Assign(swStartExpr, ExprNode::Int(i))
                         )
                     )
                 );
             }
 
-            StmtNode::AppendToStmtList(
-                doWhileBody,
+            // 4) if still -1, jump to default if exists else to end (n)
+            this->children.push_back(
                 StmtNode::If(
-                    ExprNode::Equal(
-                        ExprNode::Sigil(ExprNode::Id(new string("___F___"))),
-                        ExprNode::Int(0)
-                    ),
+                    ExprNode::Equal(swStartExpr, ExprNode::Int(-1)),
                     StmtNode::ExprStmt(
                         ExprNode::Assign(
-                            ExprNode::Sigil(ExprNode::Id(new string("___F___"))),
-                            ExprNode::Int(2)
+                            swStartExpr,
+                            ExprNode::Int(defaultIndex == -1 ? n : defaultIndex)
                         )
                     )
                 )
             );
 
+            // 5) do { if ($__sw_start <= i) { body_i } ... } while (0);
+            StmtNode *body = StmtNode::StmtList(nullptr);
+            for (int i = 0; i < n; i++) {
+                if (!labels[i].body) continue;
+
+                StmtNode::AppendToStmtList(
+                    body,
+                    StmtNode::If(
+                        ExprNode::LessOrEqual(swStartExpr, ExprNode::Int(i)),
+                        labels[i].body
+                    )
+                );
+            }
+
             this->children.push_back(
                 StmtNode::DoWhile(
-                    ExprNode::NotEqual(
-                        ExprNode::Sigil(ExprNode::Id(new string("___F___"))),
-                        ExprNode::Int(2)),
-                    doWhileBody
+                    ExprNode::Int(0), // do { ... } while (0);
+                    body
                 )
             );
 
             this->expr = nullptr;
             this->stmt = nullptr;
-
-            Warn("ST_SWITCH implementation is unfinished");
             break;
-
-        case ST_TRY:
-            if (this->catchStmt != nullptr) {
-                isOk = isOk && this->catchStmt->doSemantics();
-            } else {
-                Log("(ST_TRY) skipped catchStmt");
-            }
-
-            if (this->finallyStmt != nullptr) {
-                isOk = isOk && this->finallyStmt->doSemantics();
-            } else {
-                Log("(ST_TRY) skipped finallyStmt");
-            }
-            break;
+        }
 
         case ST_FINALLY:
         case ST_CATCH:
