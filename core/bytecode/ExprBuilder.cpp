@@ -2128,19 +2128,6 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
         case ExprType::ET_DECREMENT_POST: {
             const ExprNode *lhs = childOrNull(expr, 0);
 
-            if (!lhs || lhs->type != ExprType::ET_SIGIL) {
-                Console::Warning(std::string("Inc/dec only implemented for $var: ") + toString(expr->type));
-                *code << code->GetStatic(nullValueField);
-                return;
-            }
-
-            const ExprNode *id = childOrNull(lhs, 0);
-            std::string var = idText(id);
-
-            uint16_t localIndex = 0;
-            bool isLocal = allocLocalIfInScope(method, var, localIndex);
-            auto *fieldRef = isLocal ? nullptr : ensureGlobalVarField(root, var);
-
             bool isInc =
                     (expr->type == ExprType::ET_INCREMENT_PRE) ||
                     (expr->type == ExprType::ET_INCREMENT_POST);
@@ -2149,43 +2136,171 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
                     (expr->type == ExprType::ET_INCREMENT_POST) ||
                     (expr->type == ExprType::ET_DECREMENT_POST);
 
-            auto loadVar = [&]() {
-                if (isLocal) emitLoadLocalVarChecked(root, code, localIndex, nullValueField, var);
-                else emitLoadGlobalVarChecked(root, code, fieldRef, nullValueField, var);
-            };
+            // ------------------------------------------------------------
+            // 1) $var++ / ++$var  (your existing implementation)
+            // ------------------------------------------------------------
+            if (lhs && lhs->type == ExprType::ET_SIGIL) {
+                const ExprNode *id = childOrNull(lhs, 0);
+                std::string var = idText(id);
 
-            auto storeVar = [&]() {
-                if (isLocal) {
-                    *code << code->StoreReference(localIndex);
+                uint16_t localIndex = 0;
+                bool isLocal = allocLocalIfInScope(method, var, localIndex);
+                auto *fieldRef = isLocal ? nullptr : ensureGlobalVarField(root, var);
+
+                auto loadVar = [&]() {
+                    if (isLocal) emitLoadLocalVarChecked(root, code, localIndex, nullValueField, var);
+                    else emitLoadGlobalVarChecked(root, code, fieldRef, nullValueField, var);
+                };
+
+                auto storeVar = [&]() {
+                    if (isLocal) *code << code->StoreReference(localIndex);
+                    else *code << code->PutStatic(fieldRef);
+                };
+
+                if (isPost) {
+                    loadVar(); // old
+                    *code << code->Duplicate(); // old old
+
+                    *code << code->PushLong(1);
+                    *code << code->InvokeStatic(ofLong);
+                    *code << code->InvokeStatic(isInc ? add : sub); // old new
+
+                    *code << code->Duplicate(); // old new new
+                    storeVar(); // store new
+                    *code << code->PopOne(); // drop new, leave old
+                    return;
                 } else {
-                    *code << code->PutStatic(fieldRef);
+                    loadVar(); // old
+
+                    *code << code->PushLong(1);
+                    *code << code->InvokeStatic(ofLong);
+                    *code << code->InvokeStatic(isInc ? add : sub); // new
+
+                    *code << code->Duplicate();
+                    storeVar();
+                    return;
                 }
-            };
-
-            if (isPost) {
-                loadVar(); // old
-                *code << code->Duplicate(); // old old
-
-                *code << code->PushLong(1);
-                *code << code->InvokeStatic(ofLong);
-
-                *code << code->InvokeStatic(isInc ? add : sub); // old new
-
-                *code << code->Duplicate(); // old new new
-                storeVar(); // store new
-                *code << code->PopOne(); // drop new, leave old
-                return;
-            } else {
-                loadVar();
-
-                *code << code->PushLong(1);
-                *code << code->InvokeStatic(ofLong);
-
-                *code << code->InvokeStatic(isInc ? add : sub); // new
-                *code << code->Duplicate();
-                storeVar();
-                return;
             }
+
+            // ------------------------------------------------------------
+            // 2) self::$prop++ / A::$prop++ / static::$prop++ / parent::$prop++
+            // ------------------------------------------------------------
+            if (lhs && lhs->type == ExprType::ET_STATIC_PROPERTY_ACCESS) {
+                const ExprNode *classExpr = childOrNull(lhs, 0);
+                const ExprNode *memberExpr = childOrNull(lhs, 1);
+
+                std::string classToken = lowerCopy(idText(classExpr));
+                if (classToken.empty()) {
+                    Console::Warning("Inc/dec: missing class token (pushing NULL)");
+                    *code << code->GetStatic(nullValueField);
+                    return;
+                }
+
+                // Must be a static PROPERTY (member is ET_SIGIL). If it's a constant, reject.
+                bool isStaticProp = (memberExpr && memberExpr->type == ExprType::ET_SIGIL);
+                if (!isStaticProp) {
+                    Console::Warning(std::string("Inc/dec not valid for class constants: ") + toString(expr->type));
+                    *code << code->GetStatic(nullValueField);
+                    return;
+                }
+
+                std::string propName = idText(childOrNull(memberExpr, 0)); // e.g. "counter"
+                if (propName.empty()) {
+                    Console::Warning("Inc/dec: missing static property name (pushing NULL)");
+                    *code << code->GetStatic(nullValueField);
+                    return;
+                }
+
+                std::string callerCtx = ExprBuilder::PhpCallerClass(method);
+
+                auto emitPushCalledClass = [&]() {
+                    // Leaves PhpClass on stack
+                    if (classToken == "self") {
+                        *code << code->PushString(root->getClassName());
+                        *code << code->InvokeStatic(rtRequireClass);
+                    } else if (classToken == "static") {
+                        if (ExprBuilder::PhpMethodHasThis(method)) {
+                            *code << code->LoadReference(ExprBuilder::PhpThisLocalSlot()); // PhpObject
+                            *code << code->InvokeVirtual(objGetPhpClass); // PhpClass
+                        } else {
+                            *code << code->LoadReference(0); // PhpClass param in static methods
+                        }
+                    } else {
+                        *code << code->PushString(classToken);
+                        *code << code->InvokeStatic(rtRequireClass);
+                    }
+                };
+
+                auto emitLoadStaticProp = [&]() {
+                    if (classToken == "parent") {
+                        *code << code->PushString(root->getClassName());
+                        *code << code->PushString(propName);
+                        *code << code->PushString(callerCtx);
+                        *code << code->InvokeStatic(rtGetParentStaticPropCtx);
+                    } else {
+                        emitPushCalledClass(); // PhpClass
+                        *code << code->PushString(propName);
+                        *code << code->PushString(callerCtx);
+                        *code << code->InvokeStatic(rtGetStaticPropCtx);
+                    }
+                };
+
+                auto emitStoreStaticPropFromLocal = [&](uint16_t valueSlot) {
+                    if (classToken == "parent") {
+                        *code << code->PushString(root->getClassName());
+                        *code << code->PushString(propName);
+                        *code << code->LoadReference(valueSlot);
+                        *code << code->PushString(callerCtx);
+                        *code << code->InvokeStatic(rtSetParentStaticPropCtx);
+                        *code << code->PopOne(); // discard return
+                    } else {
+                        emitPushCalledClass(); // PhpClass
+                        *code << code->PushString(propName);
+                        *code << code->LoadReference(valueSlot);
+                        *code << code->PushString(callerCtx);
+                        *code << code->InvokeStatic(rtSetStaticPropCtx);
+                        *code << code->PopOne(); // discard return
+                    }
+                };
+
+                // temp locals
+                uint16_t tmpOld = 0;
+                uint16_t tmpNew = ExprBuilder::AllocTempLocal(method);
+
+                if (isPost) {
+                    tmpOld = ExprBuilder::AllocTempLocal(method);
+
+                    emitLoadStaticProp(); // old
+                    *code << code->Duplicate(); // old old
+                    *code << code->StoreReference(tmpOld); // old (consumed one copy into tmpOld)
+
+                    *code << code->PushLong(1);
+                    *code << code->InvokeStatic(ofLong);
+                    *code << code->InvokeStatic(isInc ? add : sub); // new
+
+                    *code << code->StoreReference(tmpNew); // store new
+                    emitStoreStaticPropFromLocal(tmpNew);
+
+                    *code << code->LoadReference(tmpOld); // result = old
+                    return;
+                } else {
+                    emitLoadStaticProp(); // old
+
+                    *code << code->PushLong(1);
+                    *code << code->InvokeStatic(ofLong);
+                    *code << code->InvokeStatic(isInc ? add : sub); // new
+
+                    *code << code->StoreReference(tmpNew);
+                    emitStoreStaticPropFromLocal(tmpNew);
+
+                    *code << code->LoadReference(tmpNew); // result = new
+                    return;
+                }
+            }
+
+            Console::Warning(std::string("Inc/dec unsupported target: ") + toString(expr->type));
+            *code << code->GetStatic(nullValueField);
+            return;
         }
 
         case ExprType::ET_STATIC_PROPERTY_ACCESS: {
