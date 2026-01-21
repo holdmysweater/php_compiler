@@ -96,7 +96,8 @@
 %nonassoc EQUAL NOT_EQUAL IDENTICALLY_EQUAL IDENTICALLY_NOT_EQUAL NOT_EQUAL_BITWISE
 %nonassoc '<' LESS_OR_EQUAL '>' GREAT_OR_EQUAL SPACESHIP
 %left LEFT_SHIFT RIGHT_SHIFT
-%left '+' '-' '.'
+%left '.'
+%left '+' '-'
 %left '*' '/' '%'
 %right POW
 %precedence '!' '~'
