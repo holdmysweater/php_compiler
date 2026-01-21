@@ -429,9 +429,9 @@ interpolatable_element: STRING { Console::ParserLog("interpolatable_element (STR
                       | COMPLEX_INTERPOLATION_START complex_interpolated_expression INTERPOLATION_END   { Console::ParserLog("interpolatable_element (COMPLEX_INTERPOLATION_START complex_interpolated_expression INTERPOLATION_END)"); $$ = $2; }
                       ;
 
-simple_interpolated_expression : '$' ID PROPERTY_ACCESS ID  { Console::ParserLog("simple_interpolated_expression ('$' ID PROPERTY_ACCESS ID)"); $$ = ExprNode::PropertyAccess(ExprNode::Id($2), ExprNode::Id($4)); }
-                               | '$' ID '[' INT ']'         { Console::ParserLog("simple_interpolated_expression ('$' ID '[' INT ']')"); $$ = ExprNode::ArrayIndex(ExprNode::Id($2), ExprNode::Int($4)); }
-                               | '$' ID '[' '$' ID ']'      { Console::ParserLog("simple_interpolated_expression ('$' ID '[' '$' ID ']')"); $$ = ExprNode::ArrayIndex(ExprNode::Id($2), ExprNode::Id($5)); }
+simple_interpolated_expression : '$' ID PROPERTY_ACCESS ID  { Console::ParserLog("simple_interpolated_expression ('$' ID PROPERTY_ACCESS ID)"); $$ = ExprNode::PropertyAccess(ExprNode::Sigil(ExprNode::Id($2)), ExprNode::Id($4)); }
+                               | '$' ID '[' INT ']'         { Console::ParserLog("simple_interpolated_expression ('$' ID '[' INT ']')"); $$ = ExprNode::ArrayIndex(ExprNode::Sigil(ExprNode::Id($2)), ExprNode::Int($4)); }
+                               | '$' ID '[' '$' ID ']'      { Console::ParserLog("simple_interpolated_expression ('$' ID '[' '$' ID ']')"); $$ = ExprNode::ArrayIndex(ExprNode::Sigil(ExprNode::Id($2)), ExprNode::Id($5)); }
                                | '$' ID                     { Console::ParserLog("simple_interpolated_expression ('$' ID)"); $$ = ExprNode::Sigil(ExprNode::Id($2)); }
                                ;
 
