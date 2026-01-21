@@ -1081,6 +1081,12 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
         )
     );
 
+    auto *toPhpString = root->getOrCreateMethodrefConstant(
+        "com/phpjvm/BasePhpValue",
+        "toPhpString",
+        DescriptorMethod(DescriptorField("java/lang/String"), {})
+    );
+
     // Add MethodRef constants for the native PHP functions
     auto *rtCount = root->getOrCreateMethodrefConstant(
         "com/phpjvm/BasePhpValue",
@@ -1734,6 +1740,14 @@ void ExprBuilder::EmitValue(Class *root, Method *method, AttributeCode *code, co
                 *code << code->PushString(className);
                 emitArgsArray(root, method, code, argsNode);
                 *code << code->InvokeStatic(rtNewObject);
+                return;
+            }
+
+            if (fn->type != ExprType::ET_ID) {
+                EmitValue(root, method, code, fn);
+                *code << code->InvokeVirtual(toPhpString);
+                emitArgsArray(root, method, code, argsNode);
+                *code << code->InvokeStatic(rtCallFunction);
                 return;
             }
 
